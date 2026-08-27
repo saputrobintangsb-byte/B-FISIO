@@ -1,0 +1,6 @@
+{
+  "name": "B Fisio App",
+  "description": "A professional physiotherapy patient medical record and therapy management PWA for physiotherapists.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

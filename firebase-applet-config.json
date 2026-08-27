@@ -1,0 +1,12 @@
+{
+  "projectId": "b-fisio-app",
+  "appId": "1:55085958555:web:9bf6cfee439db2073b0d3e",
+  "apiKey": "AIzaSyBoMi0RhuX8JN6Vh21Z9LSuml2lKIAEvS8",
+  "authDomain": "b-fisio-app.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "b-fisio-app.firebasestorage.app",
+  "messagingSenderId": "55085958555",
+  "measurementId": "",
+  "oAuthClientId": "55085958555-web.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
+}

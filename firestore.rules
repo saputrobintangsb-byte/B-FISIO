@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Patients Collection: allow full clinical record management
+    match /patients/{patientId} {
+      allow read, write: if true;
+    }
+
+    // Therapy Visits Collection: allow SOAP notes & payments tracking
+    match /visits/{visitId} {
+      allow read, write: if true;
+    }
+
+    // Application Settings & Clinic Configurations
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+  }
+}
