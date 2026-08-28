@@ -1,22 +1,26 @@
 import React, { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
-  Users,
-  CalendarCheck,
+  Users2,
+  CalendarCheck2,
   Activity,
   AlertCircle,
   Home,
   Building2,
   DollarSign,
   TrendingUp,
-  UserPlus,
+  UserPlus2,
   PlusCircle,
   ChevronRight,
   Clock,
   MapPin,
   CheckCircle2,
   Calendar,
-  FileText
+  FileText,
+  Wallet,
+  Receipt,
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 import { formatRupiah, formatDateIndonesian, formatDateShort, getTodayDateString, INDONESIAN_MONTHS } from '../utils/formatters';
 
@@ -80,47 +84,140 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-200">
-      {/* STATS GRID - 4 GEOMETRIC CARDS */}
+      {/* QUICK ACTIONS BANNER - PROMINENT TAMBAH PASIEN & CATAT KUNJUNGAN */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tambah Pasien Card */}
+        <div
+          id="dashboard-card-add-patient"
+          onClick={openAddPatientModal}
+          className="group relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 dark:from-blue-700 dark:via-blue-800 dark:to-indigo-950 p-5 rounded-2xl shadow-md hover:shadow-xl text-white cursor-pointer transition-all duration-300 transform active:scale-[0.98] border border-blue-500/30"
+        >
+          {/* Subtle background decoration */}
+          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500 pointer-events-none" />
+          
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-blue-700 transition-all duration-300">
+                <UserPlus2 className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
+                    + Tambah Pasien Baru
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30 backdrop-blur-xs">
+                    RME
+                  </span>
+                </div>
+                <p className="text-xs text-blue-100/90 mt-0.5 font-medium leading-snug">
+                  Daftarkan pasien baru, data identitas, kontak & riwayat medis awal.
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-blue-700 text-white transition-all shadow-xs shrink-0">
+              <ArrowUpRight className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Catat Kunjungan Card */}
+        <div
+          id="dashboard-card-add-visit"
+          onClick={() => openAddVisitModal(null)}
+          className="group relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 dark:from-emerald-700 dark:via-teal-800 dark:to-[#0B132B] p-5 rounded-2xl shadow-md hover:shadow-xl text-white cursor-pointer transition-all duration-300 transform active:scale-[0.98] border border-emerald-500/30"
+        >
+          {/* Subtle background decoration */}
+          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500 pointer-events-none" />
+
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-emerald-700 transition-all duration-300">
+                <PlusCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
+                    + Catat Kunjungan Terapi
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30 backdrop-blur-xs">
+                    SOAP
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-100/90 mt-0.5 font-medium leading-snug">
+                  Input sesi SOAP, intervensi modalitas fisioterapi & pembayaran.
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-emerald-700 text-white transition-all shadow-xs shrink-0">
+              <ArrowUpRight className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* STATS GRID - 4 ELEGANT CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Total Pasien */}
-        <div className="bg-white dark:bg-[#001F3F]/30 p-5 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Pasien</p>
-          <p className="text-2xl sm:text-3xl font-bold text-[#001F3F] dark:text-white">{stats?.totalPatients || 0}</p>
-          <div className="mt-3 flex items-center text-[10px] text-emerald-600 font-bold">
+        <div className="bg-white dark:bg-[#0B132B]/80 p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Total Pasien</p>
+            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+              <Users2 className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats?.totalPatients || 0}</p>
+          <div className="mt-2.5 flex items-center text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp className="w-3.5 h-3.5 mr-1" />
-            Terdaftar di database klinis
+            <span>Terdaftar di rekam medis</span>
           </div>
         </div>
 
         {/* 2. Kunjungan Hari Ini */}
-        <div className="bg-white dark:bg-[#001F3F]/30 p-5 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kunjungan Hari Ini</p>
-          <p className="text-2xl sm:text-3xl font-bold text-[#001F3F] dark:text-white">{stats?.patientsToday || 0}</p>
-          <div className="mt-3 flex items-center text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-            {stats?.clinicVisits || 0} Klinik · {stats?.homeCareVisits || 0} Home Care
+        <div className="bg-white dark:bg-[#0B132B]/80 p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Sesi Hari Ini</p>
+            <div className="p-2 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400">
+              <CalendarCheck2 className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats?.patientsToday || 0}</p>
+          <div className="mt-2.5 flex items-center text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <span>{stats?.clinicVisits || 0} Klinik · {stats?.homeCareVisits || 0} Home Care</span>
           </div>
         </div>
 
         {/* 3. Revenue Bulan Ini */}
-        <div className="bg-white dark:bg-[#001F3F]/30 p-5 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Revenue Bulan Ini</p>
-          <p className="text-2xl sm:text-3xl font-bold text-[#001F3F] dark:text-white">
+        <div className="bg-white dark:bg-[#0B132B]/80 p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Pendapatan Bulan Ini</p>
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+              <Wallet className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {formatRupiah(stats?.thisMonthRevenue || 0)}
           </p>
-          <div className="mt-3 flex items-center text-[10px] text-emerald-600 font-bold">
+          <div className="mt-2.5 flex items-center text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp className="w-3.5 h-3.5 mr-1" />
-            Hari ini: {formatRupiah(stats?.todayRevenue || 0)}
+            <span>Hari ini: {formatRupiah(stats?.todayRevenue || 0)}</span>
           </div>
         </div>
 
-        {/* 4. Piutang Berjalan / Outstanding Highlight Card */}
-        <div className="bg-[#001F3F] p-5 border border-[#001F3F] rounded-xl shadow-md text-white">
-          <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">Piutang Berjalan</p>
-          <p className="text-2xl sm:text-3xl font-bold text-white">
+        {/* 4. Piutang Berjalan / Outstanding */}
+        <div className="bg-gradient-to-br from-[#001730] to-[#0A2244] dark:from-[#060D1E] dark:to-[#0F1D38] p-5 border border-blue-900/30 rounded-2xl shadow-md text-white">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold text-cyan-300 uppercase tracking-widest">Piutang Berjalan</p>
+            <div className="p-2 rounded-xl bg-white/10 text-cyan-300">
+              <Receipt className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
             {formatRupiah(stats?.outstandingBalanceTotal || 0)}
           </p>
-          <div className="mt-3 flex items-center text-[10px] text-white/70 font-semibold">
-            {stats?.unpaidTransactions || 0} Transaksi Belum Lunas
+          <div className="mt-2.5 flex items-center text-xs text-cyan-200/80 font-medium">
+            <span>{stats?.unpaidTransactions || 0} Tagihan Belum Lunas</span>
           </div>
         </div>
       </div>

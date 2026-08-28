@@ -1,13 +1,21 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
-    --color-primary: #0F172A;
-    --color-primary-hover: #1E293B;
+    --color-primary: #001F3F;
+    --color-primary-hover: #001730;
     --color-navy-dark: #0B132B;
     --color-navy-card: #111C33;
     --color-navy-border: #1E2E4A;
     --color-navy-accent: #2563EB;
+    color-scheme: light;
+  }
+
+  html.dark,
+  :root.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -15,10 +23,43 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  .dark body,
-  html.dark body {
-    @apply bg-[#070B14] text-slate-100;
+  html.dark body,
+  .dark body {
+    @apply bg-[#070D18] text-slate-100;
   }
+}
+
+.font-barlow {
+  font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-karstar,
+.font-cursive {
+  font-family: 'Caveat', 'Dancing Script', cursive, system-ui;
+}
+
+/* Global button micro-interactions */
+button:not(:disabled) {
+  cursor: pointer;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.btn-animate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-animate:hover {
+  transform: translateY(-1px);
+}
+
+.btn-animate:active {
+  transform: translateY(0.5px) scale(0.97);
 }
 
 /* Custom Print Styles for Medical Record & Reports */

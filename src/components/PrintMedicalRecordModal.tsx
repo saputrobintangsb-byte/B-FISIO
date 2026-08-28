@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Printer, Stethoscope, HeartPulse, Layers, FileText } from 'lucide-react';
+import { X, Printer, Stethoscope, HeartPulse, Layers, FileText, Download, Loader2 } from 'lucide-react';
 import { formatDateIndonesian, formatRupiah, calculateAsianBMI } from '../utils/formatters';
+import { AppLogo } from './AppLogo';
+import { exportElementToPdf } from '../utils/pdfExport';
 
 export const PrintMedicalRecordModal: React.FC = () => {
-  const { isPrintModalOpen, closePrintModal, printingPatient, visits, settings } = useApp();
+  const { isPrintModalOpen, closePrintModal, printingPatient, visits, settings, showToast } = useApp();
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   if (!isPrintModalOpen || !printingPatient) return null;
 
@@ -19,6 +22,20 @@ export const PrintMedicalRecordModal: React.FC = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const sanitizedName = printingPatient.fullName.replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `Rekam_Medis_${sanitizedName}_${printingPatient.mrn}.pdf`;
+      await exportElementToPdf('printable-medical-record-content', fileName);
+      showToast('success', `File PDF ${fileName} berhasil diunduh.`, 'Download PDF Sukses');
+    } catch (err) {
+      showToast('error', 'Gagal membuat file PDF. Silakan coba lagi atau gunakan Cetak / Simpan PDF.', 'Error Export');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   const hasTTV = !!(
@@ -58,6 +75,23 @@ export const PrintMedicalRecordModal: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl transition-colors shadow-xs"
+            >
+              {isDownloadingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Mengunduh PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Download PDF</span>
+                </>
+              )}
+            </button>
+            <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-colors shadow-xs"
             >
@@ -74,16 +108,17 @@ export const PrintMedicalRecordModal: React.FC = () => {
         </div>
 
         {/* Printable Document Body */}
-        <div className="p-8 sm:p-12 overflow-y-auto space-y-6 text-slate-900 dark:text-slate-100 print:text-black print:p-0 print:overflow-visible bg-white dark:bg-slate-950 print:bg-white">
+        <div
+          id="printable-medical-record-content"
+          className="p-8 sm:p-12 overflow-y-auto space-y-6 text-slate-900 dark:text-slate-100 print:text-black print:p-0 print:overflow-visible bg-white dark:bg-slate-950 print:bg-white"
+        >
           
           {/* Header Kop Surat */}
           <div className="border-b-2 border-slate-900 dark:border-slate-100 print:border-black pb-4 text-center">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded bg-[#001F3F] text-white flex items-center justify-center font-black text-xs print:bg-black">
-                B
-              </div>
+            <div className="flex items-center justify-center gap-2.5 mb-1">
+              <AppLogo className="w-8 h-8 print:w-8 print:h-8" />
               <h1 className="text-xl font-black tracking-wider uppercase">
-                {settings.clinicInfo?.name || 'B FISIO CLINIC & HOME CARE'}
+                {settings.clinicInfo?.name || 'B FISIO "RME FISIOTERAPI"'}
               </h1>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 print:text-slate-700">
@@ -138,6 +173,14 @@ export const PrintMedicalRecordModal: React.FC = () => {
                 <span className="text-slate-500 print:text-slate-600 block">Keluhan Utama:</span>
                 <span>{printingPatient.mainComplaint || '-'}</span>
               </div>
+              {typeof printingPatient.vasScore === 'number' && (
+                <div>
+                  <span className="text-slate-500 print:text-slate-600 block">Derajat Nyeri (VAS):</span>
+                  <strong className="text-slate-900 dark:text-white print:text-black">
+                    VAS {printingPatient.vasScore}/10 {printingPatient.vasCategory ? `(${printingPatient.vasCategory})` : ''}
+                  </strong>
+                </div>
+              )}
               <div>
                 <span className="text-slate-500 print:text-slate-600 block">Alamat / Lokasi:</span>
                 <span>{printingPatient.address || '-'}</span>
@@ -307,12 +350,19 @@ export const PrintMedicalRecordModal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Interventions */}
-                    <div>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300 print:text-black">
-                        Tindakan / Intervensi:{' '}
-                      </span>
-                      <span className="font-medium">{v.interventions.join(', ')}</span>
+                    {/* Interventions & VAS */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="font-semibold text-slate-700 dark:text-slate-300 print:text-black">
+                          Tindakan / Intervensi:{' '}
+                        </span>
+                        <span className="font-medium">{v.interventions.join(', ')}</span>
+                      </div>
+                      {typeof v.vasScore === 'number' && (
+                        <div className="text-[11px] font-medium text-rose-700 dark:text-rose-400 print:text-black">
+                          Skala Nyeri (VAS): <strong>{v.vasScore}/10</strong> {v.vasCategory ? `(${v.vasCategory})` : ''}
+                        </div>
+                      )}
                     </div>
 
                     {/* SOAP block */}

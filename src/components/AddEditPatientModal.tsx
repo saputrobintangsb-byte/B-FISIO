@@ -31,6 +31,7 @@ import {
 import { Patient, Gender, VitalSigns, SupportingDocument } from '../types';
 import { calculateAge, getTodayDateString, calculateAsianBMI } from '../utils/formatters';
 import { dbService } from '../services/db';
+import { VasPainScale, getVasInterpretation } from './VasPainScale';
 
 export const AddEditPatientModal: React.FC = () => {
   const {
@@ -68,6 +69,7 @@ export const AddEditPatientModal: React.FC = () => {
   // Clinical & Anamnesis State
   const [diagnosis, setDiagnosis] = useState('');
   const [mainComplaint, setMainComplaint] = useState('');
+  const [vasScore, setVasScore] = useState<number>(0);
   const [currentMedicalHistory, setCurrentMedicalHistory] = useState(''); // Riwayat Penyakit Sekarang (RPS)
   const [additionalNotes, setAdditionalNotes] = useState('');
 
@@ -116,6 +118,7 @@ export const AddEditPatientModal: React.FC = () => {
       // Clinical & ICF
       setDiagnosis(editingPatient.diagnosis || '');
       setMainComplaint(editingPatient.mainComplaint || '');
+      setVasScore(typeof editingPatient.vasScore === 'number' ? editingPatient.vasScore : 0);
       setCurrentMedicalHistory(editingPatient.currentMedicalHistory || '');
       setAdditionalNotes(editingPatient.additionalNotes || '');
 
@@ -152,6 +155,7 @@ export const AddEditPatientModal: React.FC = () => {
       // Clinical & ICF
       setDiagnosis('');
       setMainComplaint('');
+      setVasScore(0);
       setCurrentMedicalHistory('');
       setAdditionalNotes('');
 
@@ -226,10 +230,6 @@ export const AddEditPatientModal: React.FC = () => {
     showToast('success', 'Link Google Drive berhasil ditambahkan ke daftar.', 'Tautan Tersimpan');
   };
 
-  const handleQuickSetTitle = (preset: string) => {
-    setNewDocTitle(preset);
-  };
-
   const handleUpdateDocTitle = (id: string, title: string) => {
     setSupportingDocs((prev) =>
       prev.map((d) => (d.id === id ? { ...d, title } : d))
@@ -293,6 +293,8 @@ export const AddEditPatientModal: React.FC = () => {
         // Clinical Anamnesis
         diagnosis: diagnosis.trim(),
         mainComplaint: mainComplaint.trim(),
+        vasScore,
+        vasCategory: getVasInterpretation(vasScore).category,
         currentMedicalHistory: currentMedicalHistory.trim(),
         additionalNotes: additionalNotes.trim(),
 
@@ -810,12 +812,21 @@ export const AddEditPatientModal: React.FC = () => {
               />
             </div>
 
+            {/* Pemeriksaan Derajat Nyeri (VAS) */}
+            <div>
+              <VasPainScale
+                value={vasScore}
+                onChange={(val) => setVasScore(val)}
+                label="Pemeriksaan Derajat Nyeri Pasien (VAS - Visual Analog Scale)"
+              />
+            </div>
+
             {/* 6 ICF Domains Grid */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
               <div className="flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  6 Domain Fisioterapi (International Classification of Functioning)
+                  6. ICF (International Classification of Functioning)
                 </h5>
               </div>
 
@@ -988,25 +999,6 @@ export const AddEditPatientModal: React.FC = () => {
                     placeholder="https://drive.google.com/file/d/... atau https://drive.google.com/drive/folders/..."
                     className="w-full pl-9 pr-3.5 py-2 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                   />
-                </div>
-              </div>
-
-              {/* Quick Title Presets */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                  Pilihan Cepat Keterangan:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {['Hasil MRI Lumbal', 'Foto Rontgen X-Ray', 'Hasil CT-Scan', 'USG Muskuloskeletal', 'Hasil Lab Darah'].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => handleQuickSetTitle(preset)}
-                      className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
-                    >
-                      + {preset}
-                    </button>
-                  ))}
                 </div>
               </div>
 

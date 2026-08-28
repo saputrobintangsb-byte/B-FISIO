@@ -63,6 +63,10 @@ export interface Patient {
   mainComplaint: string;
   currentMedicalHistory?: string; // Riwayat Penyakit Sekarang (RPS)
 
+  // VAS Pain Scale (0 - 10)
+  vasScore?: number;
+  vasCategory?: string;
+
   // 6 Domain ICF (International Classification of Functioning, Disability and Health)
   bodyFunction?: string; // 1. Body Function (Fungsi Tubuh / Fisiologis)
   bodyStructure?: string; // 2. Body Structure (Struktur Tubuh / Anatomi)
@@ -101,6 +105,8 @@ export interface TherapyVisit {
   therapist: string; // e.g. "Bintang"
   interventions: string[]; // e.g. ["IR", "TENS", "Massage", "Stretching"]
   customInterventions?: string[];
+  vasScore?: number;
+  vasCategory?: string;
   soap: SoapNote;
   payment: PaymentRecord;
   createdAt: string;

@@ -192,10 +192,11 @@ export const PatientProfileView: React.FC = () => {
           <button
             id="btn-delete-profile"
             onClick={() => setDeletePatientConfirm(true)}
-            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl transition-colors shadow-xs"
             title="Hapus Pasien"
           >
             <Trash2 className="w-4 h-4" />
+            <span>Hapus Pasien</span>
           </button>
         </div>
       </div>
@@ -225,16 +226,19 @@ export const PatientProfileView: React.FC = () => {
                 {patient.diagnosis || 'Tanpa diagnosa medis terdaftar'}
               </p>
 
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 mt-3">
-                <span className="flex items-center gap-1.5">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 text-xs text-slate-300 mt-3">
+                <span className="flex items-center gap-1.5 shrink-0">
                   <Phone className="w-3.5 h-3.5 text-blue-400" />
                   <a href={`https://wa.me/${patient.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="hover:underline">
                     {patient.phone}
                   </a>
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                  <span className="truncate max-w-xs">{patient.address || 'Alamat belum dicatat'}</span>
+                <span className="hidden sm:inline text-slate-500">•</span>
+                <span className="flex items-start gap-1.5 min-w-0 max-w-full">
+                  <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                  <span className="break-words whitespace-normal text-slate-200 leading-relaxed max-w-2xl">
+                    {patient.address || 'Alamat belum dicatat'}
+                  </span>
                 </span>
               </div>
             </div>
@@ -670,7 +674,7 @@ export const PatientProfileView: React.FC = () => {
                                 {formatDateIndonesian(visit.date)}
                               </span>
                               <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-mono">
-                                Kunjungan ke-{visit.visitNumber}
+                                Ke {visit.visitNumber}
                               </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">

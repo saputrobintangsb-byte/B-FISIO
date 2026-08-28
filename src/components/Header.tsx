@@ -2,16 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Search,
-  UserPlus,
-  PlusCircle,
   Menu,
   Sun,
   Moon,
   Laptop,
-  CheckCircle2,
   Calendar,
   X,
-  Phone
+  Phone,
+  Sparkles
 } from 'lucide-react';
 import { formatDateShort } from '../utils/formatters';
 
@@ -26,8 +24,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
     setTheme,
     patients,
     viewPatientProfile,
-    openAddPatientModal,
-    openAddVisitModal,
     settings,
   } = useApp();
 
@@ -35,12 +31,23 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  // Cycle theme: light -> dark -> system -> light
+  const handleToggleTheme = () => {
+    if (theme === 'light') {
+      setTheme('dark');
+    } else if (theme === 'dark') {
+      setTheme('system');
+    } else {
+      setTheme('light');
+    }
+  };
+
   // Get Page Title and Description based on activeView
   const getPageInfo = () => {
     switch (activeView) {
       case 'dashboard':
         return {
-          title: 'Dashboard Fisioterapi',
+          title: 'Dashboard',
           subtitle: 'Ringkasan aktivitas klinis, rekam medis, dan pendapatan harian.',
         };
       case 'patients':
@@ -66,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
       case 'settings':
         return {
           title: 'Pengaturan Aplikasi',
-          subtitle: 'Konfigurasi terapis, tarif tindakan standar, data klinik, dan cadangan database.',
+          subtitle: 'Konfigurasi terapis, tarif tindakan standar, data klinik, dan database.',
         };
       default:
         return {
@@ -109,34 +116,34 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
   };
 
   return (
-    <header className="sticky top-0 z-20 bg-white dark:bg-[#001F3F] border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#060B18]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 transition-colors duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         {/* Left: Hamburger + Page Title */}
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenMobileMenu}
-            className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"
             title="Buka Menu"
           >
             <Menu className="w-5 h-5" />
           </button>
 
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-[#001F3F] dark:text-white tracking-tight leading-tight">
+            <h1 className="text-lg sm:text-xl font-extrabold text-[#001730] dark:text-white tracking-tight leading-tight">
               {title}
             </h1>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mt-0.5">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wide mt-0.5 hidden sm:block">
               {subtitle}
             </p>
           </div>
         </div>
 
         {/* Right: Search + Theme Toggle + Quick Actions */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          {/* Quick Search with rounded-full pill */}
-          <div ref={searchRef} className="relative flex-1 sm:w-60 md:w-72">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          {/* Quick Search with rounded-xl pill */}
+          <div ref={searchRef} className="relative flex-1 sm:w-56 md:w-64">
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 id="header-global-search"
                 type="text"
@@ -147,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
                 }}
                 onFocus={() => setShowSearchResults(true)}
                 placeholder="Cari Pasien / RM / Diagnosa..."
-                className="w-full pl-9 pr-8 py-1.5 rounded-full bg-slate-100 dark:bg-slate-900 border-none text-xs sm:text-sm text-[#0F172A] dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#001F3F] dark:focus:ring-blue-400 transition-all"
+                className="w-full pl-9 pr-8 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 text-xs sm:text-sm text-[#0F172A] dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               />
               {searchQuery && (
                 <button
@@ -161,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
 
             {/* Live Search Suggestions Dropdown */}
             {showSearchResults && searchQuery.trim().length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#001F3F] rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#0B132B] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                 <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
                   Hasil Pencarian ({matchingPatients.length})
                 </div>
@@ -181,7 +188,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
                           <span className="font-bold text-sm text-[#001F3F] dark:text-white">
                             {p.fullName}
                           </span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[#001F3F] dark:text-blue-300 font-bold">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 dark:bg-slate-800 text-blue-700 dark:text-blue-300 font-bold">
                             {p.mrn}
                           </span>
                         </div>
@@ -203,24 +210,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
             )}
           </div>
 
-          {/* Quick Action Button: Tambah Pasien */}
+          {/* Direct Quick Theme Toggle Button in Header */}
           <button
-            id="header-btn-add-patient"
-            onClick={openAddPatientModal}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-[#001F3F] dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 uppercase tracking-wide transition-all shadow-xs"
+            id="header-btn-theme-toggle"
+            type="button"
+            onClick={handleToggleTheme}
+            className="p-2 sm:px-2.5 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 shadow-2xs shrink-0 flex items-center justify-center"
+            title={`Tema saat ini: ${theme === 'dark' ? 'Mode Gelap' : theme === 'light' ? 'Mode Terang' : 'Otomatis'}. Klik untuk mengubah.`}
           >
-            <UserPlus className="w-4 h-4 text-slate-500" />
-            <span className="hidden sm:inline">Tambah Pasien</span>
-          </button>
-
-          {/* Quick Action Button: Tambah Kunjungan (Navy Geometric) */}
-          <button
-            id="header-btn-add-visit"
-            onClick={() => openAddVisitModal(null)}
-            className="bg-[#001F3F] dark:bg-blue-600 hover:bg-[#001730] dark:hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex items-center gap-2 shadow-xs transition-all active:scale-98"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ Kunjungan</span>
+            {theme === 'light' ? (
+              <Sun className="w-4 h-4 text-amber-500 animate-in spin-in-180 duration-200" />
+            ) : theme === 'dark' ? (
+              <Moon className="w-4 h-4 text-blue-400 animate-in spin-in-180 duration-200" />
+            ) : (
+              <Laptop className="w-4 h-4 text-slate-400 animate-in fade-in duration-200" />
+            )}
           </button>
         </div>
       </div>

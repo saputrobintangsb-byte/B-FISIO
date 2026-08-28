@@ -18,6 +18,7 @@ import {
 import { TherapyVisit, Patient, TherapyLocation, PaymentStatus, SoapNote, PaymentRecord } from '../types';
 import { getTodayDateString, formatRupiah } from '../utils/formatters';
 import { dbService } from '../services/db';
+import { VasPainScale, getVasInterpretation } from './VasPainScale';
 
 const STANDARD_INTERVENTIONS = [
   'IR',
@@ -69,6 +70,7 @@ export const AddEditVisitModal: React.FC = () => {
   const [customInterventionsList, setCustomInterventionsList] = useState<string[]>([]);
 
   // SOAP State
+  const [vasScore, setVasScore] = useState<number>(0);
   const [soap, setSoap] = useState<SoapNote>({
     subjective: '',
     objective: '',
@@ -111,6 +113,7 @@ export const AddEditVisitModal: React.FC = () => {
       setTherapist(editingVisit.therapist);
       setSelectedInterventions(editingVisit.interventions || []);
       setCustomInterventionsList(editingVisit.customInterventions || []);
+      setVasScore(typeof editingVisit.vasScore === 'number' ? editingVisit.vasScore : 0);
       setSoap(editingVisit.soap || { subjective: '', objective: '', assessment: '', plan: '' });
       setTherapyPrice(editingVisit.payment.therapyPrice || 0);
       setTransport(editingVisit.payment.transport || 0);
@@ -126,6 +129,7 @@ export const AddEditVisitModal: React.FC = () => {
       setTherapist(settings.defaultTherapist || 'Bintang');
       setSelectedInterventions(['IR', 'TENS', 'Massage', 'Stretching']);
       setCustomInterventionsList([]);
+      setVasScore(typeof p?.vasScore === 'number' ? p.vasScore : 0);
       setSoap({
         subjective: p ? `Keluhan utama: ${p.mainComplaint || p.diagnosis}` : '',
         objective: '',
@@ -244,6 +248,8 @@ export const AddEditVisitModal: React.FC = () => {
         therapist: finalTherapistName,
         interventions: selectedInterventions,
         customInterventions: customInterventionsList,
+        vasScore,
+        vasCategory: getVasInterpretation(vasScore).category,
         soap,
         payment: finalPayment,
         createdAt: editingVisit?.createdAt || new Date().toISOString(),
@@ -548,8 +554,17 @@ export const AddEditVisitModal: React.FC = () => {
           {/* Section 4: SOAP Documentation */}
           <div className="pt-2 space-y-3">
             <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-              4. Catatan SOAP Rekam Medis
+              4. Catatan SOAP & Evaluasi Nyeri (VAS)
             </h4>
+
+            {/* VAS Pain Scale Assessment */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <VasPainScale
+                value={vasScore}
+                onChange={(val) => setVasScore(val)}
+                label="Derajat Nyeri Sesi Kunjungan Ini (VAS)"
+              />
+            </div>
 
             {/* S - Subjective */}
             <div>

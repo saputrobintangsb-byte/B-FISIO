@@ -312,7 +312,7 @@ export const TherapyHistoryView: React.FC = () => {
                           {visit.mrn}
                         </span>
                         <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-mono">
-                          Kunjungan ke-{visit.visitNumber}
+                          Ke {visit.visitNumber}
                         </span>
                       </div>
 
