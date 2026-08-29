@@ -15,16 +15,20 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseReady, firebaseConfig } from './firebase';
 
-function cleanForFirestore<T extends Record<string, any>>(obj: T): T {
-  if (!obj || typeof obj !== 'object') return obj;
-  const result: any = Array.isArray(obj) ? [] : {};
-  for (const [key, value] of Object.entries(obj)) {
+function cleanForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => cleanForFirestore(item)) as unknown as T;
+  }
+
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, any>)) {
     if (value !== undefined) {
-      if (value !== null && typeof value === 'object') {
-        result[key] = cleanForFirestore(value);
-      } else {
-        result[key] = value;
-      }
+      result[key] = cleanForFirestore(value);
     }
   }
   return result as T;

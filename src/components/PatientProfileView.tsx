@@ -59,6 +59,13 @@ export const PatientProfileView: React.FC = () => {
   const [deletePatientConfirm, setDeletePatientConfirm] = useState(false);
   const [activePreviewDoc, setActivePreviewDoc] = useState<SupportingDocument | null>(null);
 
+  // Quick Supporting Document State
+  const [isAddingDoc, setIsAddingDoc] = useState(false);
+  const [newDocUrl, setNewDocUrl] = useState('');
+  const [newDocTitle, setNewDocTitle] = useState('');
+  const [newDocNotes, setNewDocNotes] = useState('');
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
+
   // Find active patient
   const patient = useMemo(() => {
     return patients.find((p) => p.id === selectedPatientId) || null;
@@ -129,6 +136,64 @@ export const PatientProfileView: React.FC = () => {
       setActiveView('patients');
     } catch {
       showToast('error', 'Gagal menghapus data pasien.', 'Error');
+    }
+  };
+
+  const handleSaveNewDoc = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newDocUrl.trim()) {
+      showToast('warning', 'Masukkan URL / link Google Drive terlebih dahulu.', 'Link Kosong');
+      return;
+    }
+
+    let formattedUrl = newDocUrl.trim();
+    if (!/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = `https://${formattedUrl}`;
+    }
+
+    const newDocItem: SupportingDocument = {
+      id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      title: newDocTitle.trim() || 'Data Penunjang Google Drive',
+      url: formattedUrl,
+      notes: newDocNotes.trim(),
+      addedAt: new Date().toISOString(),
+    };
+
+    setIsSavingDoc(true);
+    try {
+      const updatedDocs = [...(patient.supportingDocs || []), newDocItem];
+      const updatedPatient = {
+        ...patient,
+        supportingDocs: updatedDocs,
+        updatedAt: new Date().toISOString(),
+      };
+      await dbService.savePatient(updatedPatient);
+      await refreshData();
+      setNewDocUrl('');
+      setNewDocTitle('');
+      setNewDocNotes('');
+      setIsAddingDoc(false);
+      showToast('success', 'Link data penunjang Google Drive berhasil disimpan.', 'Data Tersimpan');
+    } catch (err) {
+      showToast('error', 'Gagal menyimpan link data penunjang.', 'Error');
+    } finally {
+      setIsSavingDoc(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    try {
+      const updatedDocs = (patient.supportingDocs || []).filter((d) => d.id !== docId);
+      const updatedPatient = {
+        ...patient,
+        supportingDocs: updatedDocs,
+        updatedAt: new Date().toISOString(),
+      };
+      await dbService.savePatient(updatedPatient);
+      await refreshData();
+      showToast('success', 'Link data penunjang berhasil dihapus.', 'Tautan Dihapus');
+    } catch (err) {
+      showToast('error', 'Gagal menghapus link data penunjang.', 'Error');
     }
   };
 
@@ -487,20 +552,101 @@ export const PatientProfileView: React.FC = () => {
           {/* Card 4: Data Penunjang (Link Google Drive / Berkas Lab) */}
           <div className="bg-white dark:bg-[#001F3F]/40 dark:backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <HardDrive className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                Data Penunjang (Google Drive)
-              </h3>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {patient.supportingDocs?.length || 0} Tautan
-              </span>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Data Penunjang (Google Drive)
+                </h3>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  ({patient.supportingDocs?.length || 0})
+                </span>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => setIsAddingDoc(!isAddingDoc)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>{isAddingDoc ? 'Tutup Form' : '+ Tambah Link'}</span>
+              </button>
             </div>
+
+            {/* Quick Add Form inside Profile */}
+            {isAddingDoc && (
+              <form
+                onSubmit={handleSaveNewDoc}
+                className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/80 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3"
+              >
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                  <LinkIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Tambah Link Google Drive Baru</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    URL / Link Google Drive <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={newDocUrl}
+                    onChange={(e) => setNewDocUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/... atau https://drive.google.com/drive/folders/..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Keterangan / Judul Dokumen
+                    </label>
+                    <input
+                      type="text"
+                      value={newDocTitle}
+                      onChange={(e) => setNewDocTitle(e.target.value)}
+                      placeholder="Contoh: Hasil MRI Lumbal, Rontgen X-Ray"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Catatan / Hasil Ekspertise Dokter
+                    </label>
+                    <input
+                      type="text"
+                      value={newDocNotes}
+                      onChange={(e) => setNewDocNotes(e.target.value)}
+                      placeholder="Contoh: Tampak penyempitan diskus L4-L5"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingDoc(false)}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingDoc}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+                  >
+                    {isSavingDoc ? 'Menyimpan...' : 'Simpan Link'}
+                  </button>
+                </div>
+              </form>
+            )}
 
             {patient.supportingDocs && patient.supportingDocs.length > 0 ? (
               <div className="space-y-3">
                 {patient.supportingDocs.map((doc, idx) => {
                   const hasDataUrl = !!doc.dataUrl;
-                  const driveUrl = doc.url || (hasDataUrl ? '#' : '');
 
                   return (
                     <div
@@ -535,33 +681,51 @@ export const PatientProfileView: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Button to open external Google Drive link */}
-                        {doc.url ? (
-                          <a
-                            href={doc.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#001F3F] dark:bg-blue-600 hover:bg-[#001730] dark:hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold transition-all shadow-xs shrink-0"
-                          >
-                            <span>Buka di Drive</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : hasDataUrl ? (
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {doc.url ? (
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#001F3F] dark:bg-blue-600 hover:bg-[#001730] dark:hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold transition-all shadow-xs"
+                            >
+                              <span>Buka di Drive</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : hasDataUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setActivePreviewDoc(doc)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-white rounded-lg text-[11px] font-semibold transition-all"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Lihat Berkas</span>
+                            </button>
+                          ) : null}
+
                           <button
                             type="button"
-                            onClick={() => setActivePreviewDoc(doc)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-white rounded-lg text-[11px] font-semibold transition-all shrink-0"
+                            onClick={() => handleDeleteDoc(doc.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                            title="Hapus Link Ini"
                           >
-                            <Eye className="w-3 h-3" />
-                            <span>Lihat Berkas</span>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        ) : null}
+                        </div>
                       </div>
 
                       {/* Display URL text for reference */}
                       {doc.url && (
                         <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                          <span className="truncate max-w-[85%]">{doc.url}</span>
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate max-w-[80%] hover:text-blue-500 underline"
+                          >
+                            {doc.url}
+                          </a>
                           <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-sans font-medium">Tersimpan di Cloud</span>
                         </div>
                       )}
@@ -570,7 +734,7 @@ export const PatientProfileView: React.FC = () => {
                 })}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic">Belum ada tautan data penunjang Google Drive yang disimpan.</p>
+              <p className="text-xs text-slate-400 italic">Belum ada tautan data penunjang Google Drive yang disimpan. Klik &quot;+ Tambah Link&quot; di atas untuk menambahkan.</p>
             )}
           </div>
 

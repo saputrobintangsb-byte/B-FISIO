@@ -280,6 +280,22 @@ export const AddEditPatientModal: React.FC = () => {
         bmiCategory: bmiInfo.category || undefined,
       };
 
+      // Auto-include any pending Google Drive link if the user typed it but forgot to click "+ Tambah"
+      let finalSupportingDocs = [...supportingDocs];
+      if (newDocUrl.trim()) {
+        let formattedUrl = newDocUrl.trim();
+        if (!/^https?:\/\//i.test(formattedUrl)) {
+          formattedUrl = `https://${formattedUrl}`;
+        }
+        finalSupportingDocs.push({
+          id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          title: newDocTitle.trim() || 'Data Penunjang Google Drive',
+          url: formattedUrl,
+          notes: newDocNotes.trim(),
+          addedAt: new Date().toISOString(),
+        });
+      }
+
       const patientData: Patient = {
         id: editingPatient?.id || '',
         mrn: mrn.trim() || (await dbService.generateMRN()),
@@ -310,7 +326,7 @@ export const AddEditPatientModal: React.FC = () => {
         vitalSigns: vitalSignsData,
 
         // Data Penunjang
-        supportingDocs,
+        supportingDocs: finalSupportingDocs,
 
         createdAt: editingPatient?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -996,6 +1012,12 @@ export const AddEditPatientModal: React.FC = () => {
                     type="url"
                     value={newDocUrl}
                     onChange={(e) => setNewDocUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddGoogleDriveDoc();
+                      }
+                    }}
                     placeholder="https://drive.google.com/file/d/... atau https://drive.google.com/drive/folders/..."
                     className="w-full pl-9 pr-3.5 py-2 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                   />
@@ -1012,6 +1034,12 @@ export const AddEditPatientModal: React.FC = () => {
                     type="text"
                     value={newDocTitle}
                     onChange={(e) => setNewDocTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddGoogleDriveDoc();
+                      }
+                    }}
                     placeholder="Contoh: Hasil MRI Lumbal L4-L5, Rontgen Bahu Kiri"
                     className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
@@ -1026,6 +1054,12 @@ export const AddEditPatientModal: React.FC = () => {
                     type="text"
                     value={newDocNotes}
                     onChange={(e) => setNewDocNotes(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddGoogleDriveDoc();
+                      }
+                    }}
                     placeholder="Contoh: Tampak penyempitan diskus intervertebralis L4-L5"
                     className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
