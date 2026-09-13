@@ -73,662 +73,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
 };
 
-// Seed sample patient data for realistic first-time experience
-const SEED_PATIENTS: Patient[] = [
-  {
-    id: 'p-seed-1',
-    mrn: 'RM-00001',
-    fullName: 'Bambang Supriyanto',
-    dob: '1974-05-12',
-    age: 52,
-    gender: 'L',
-    phone: '081289123456',
-    address: 'Jl. Mawar No. 14, Tebet, Jakarta Selatan',
-    diagnosis: 'Low Back Pain e.c. Hernia Nukleus Pulposus (HNP L4-L5)',
-    mainComplaint: 'Nyeri punggung bawah menjalar ke tungkai kanan, VAS 7/10',
-    currentMedicalHistory: 'Nyeri dirasakan memberat sejak 3 minggu lalu setelah mengangkat galon air. Nyeri bertambah tajam saat duduk lama di depan laptop dan berkurang saat berbaring lurus.',
-    bodyFunction: 'Nyeri gerak fleksi lumbal VAS 7/10, spasme m. erector spinae dan m. piriformis dextra, hipomobilitas segmen lumbal bawah L4-L5.',
-    bodyStructure: 'Diskus intervertebralis L4-L5, facet joint lumbal, radiks saraf ischiadicus segmen dextra.',
-    activityLimitation: 'Keterbatasan saat duduk tegak > 30 menit, kesulitan membungkuk saat wudhu / memakai celana, gangguan transfer dari duduk ke berdiri.',
-    participationRestriction: 'Tidak dapat bekerja lembur di kantor, terganggu saat mengemudi mobil harian, sholat terpaksa menggunakan kursi.',
-    personalFactor: 'Pria usia 52 tahun, pekerjaan software engineer dengan gaya hidup sedentari, motivasi kesembuhan tinggi.',
-    environmentalFactor: 'Kursi kerja di kantor non-ergonomis, kamar tidur berada di lantai 2 perlu menaiki tangga.',
-    vitalSigns: {
-      bloodPressure: '125/80',
-      heartRate: 76,
-      respiratoryRate: 18,
-      spo2: 98,
-      temperature: 36.5,
-      height: 175,
-      weight: 75,
-      bmi: 24.5,
-      bmiCategory: 'Overweight',
-    },
-    supportingDocs: [
-      {
-        id: 'doc-seed-1',
-        title: 'Hasil MRI Lumbal L4-L5',
-        url: 'https://drive.google.com/file/d/1aB2c3D4e5F6g7H8i9J0kLmNoPqRsTuVw/view?usp=sharing',
-        notes: 'Kesan: Protusio diskus intervertebralis L4-L5 menekan thecal sac kanan',
-        addedAt: '2026-08-01T08:30:00.000Z',
-      },
-      {
-        id: 'doc-seed-2',
-        title: 'Foto Rontgen Vertebra Lumbosakral AP/Lat',
-        url: 'https://drive.google.com/file/d/1XyZ9876543210AbCdEfGhIjKlMnOpQrS/view?usp=sharing',
-        notes: 'Alignment lordotik berkurang (spasmus paravertebral), penyempitan disk space L4-L5',
-        addedAt: '2026-08-01T08:45:00.000Z',
-      }
-    ],
-    additionalNotes: 'Pasien pekerja kantoran, duduk lama > 8 jam/hari',
-    createdAt: '2026-08-01T08:00:00.000Z',
-    updatedAt: '2026-08-25T10:00:00.000Z',
-    totalVisits: 3,
-    lastVisitDate: '2026-08-25',
-    lastLocation: 'Home Care',
-    lastTherapist: 'Bintang',
-    totalSpending: 705000,
-    outstandingBalance: 0,
-    lastPaymentStatus: 'Lunas',
-  },
-  {
-    id: 'p-seed-2',
-    mrn: 'RM-00002',
-    fullName: 'Siti Rahmawati',
-    dob: '1968-11-20',
-    age: 57,
-    gender: 'P',
-    phone: '081399887766',
-    address: 'Jl. Kenanga No. 8, Rawamangun, Jakarta Timur',
-    diagnosis: 'Frozen Shoulder Sinistra (Adhesive Capsulitis)',
-    mainComplaint: 'Bahu kiri kaku, nyeri saat mengangkat tangan dan menyisir rambut',
-    currentMedicalHistory: 'Keluhan kaku dan nyeri bahu kiri dirasakan sejak 1 bulan lalu tanpa riwayat trauma. Nyeri sering terasa menusuk pada malam hari terutama saat tidur miring ke sisi kiri.',
-    bodyFunction: 'Keterbatasan ROM aktif dan pasif glenohumeral (fleksi 100°, abduksi 85°, eksorotasi 20°), nyeri end-feel capsular VAS 6/10.',
-    bodyStructure: 'Kapsul artikular sendi glenohumeral sinistra, bursa subacromial, m. rotator cuff.',
-    activityLimitation: 'Kesulitan menyisir rambut, mengenakan bra, memakai baju kaos, dan meraih dompet di saku belakang.',
-    participationRestriction: 'Terganggu saat berbelanja di pasar swalayan dan tidak dapat mengikuti senam lansia mingguan.',
-    personalFactor: 'Wanita usia 57 tahun, ibu rumah tangga, ada riwayat diabetes melitus tipe 2 terkontrol.',
-    environmentalFactor: 'Lemari dapur posisinya tinggi sehingga sulit dijangkau dengan tangan kiri.',
-    vitalSigns: {
-      bloodPressure: '130/85',
-      heartRate: 82,
-      respiratoryRate: 20,
-      spo2: 97,
-      temperature: 36.6,
-      height: 155,
-      weight: 52,
-      bmi: 21.6,
-      bmiCategory: 'Normal / Ideal',
-    },
-    additionalNotes: 'Ada riwayat DM terkontrol',
-    createdAt: '2026-08-05T09:00:00.000Z',
-    updatedAt: '2026-08-26T14:30:00.000Z',
-    totalVisits: 4,
-    lastVisitDate: '2026-08-26',
-    lastLocation: 'Klinik',
-    lastTherapist: 'Bintang',
-    totalSpending: 600000,
-    outstandingBalance: 150000,
-    lastPaymentStatus: 'DP',
-  },
-  {
-    id: 'p-seed-3',
-    mrn: 'RM-00003',
-    fullName: 'Hendro Wijaya',
-    dob: '1959-03-15',
-    age: 67,
-    gender: 'L',
-    phone: '08176543210',
-    address: 'Jl. Cempaka Putih Tengah No. 22',
-    diagnosis: 'Post Stroke Non-Hemoragik Fase Recovery (Hemiparese Dextra)',
-    mainComplaint: 'Kelemahan anggota gerak kanan, gangguan pola jalan dan transfer',
-    currentMedicalHistory: 'Pasien mengalami stroke non-hemoragik 2 bulan lalu. Sempat dirawat inap di RS selama 10 hari, saat ini menjalani program pemulihan fisioterapi home care.',
-    bodyFunction: 'Penurunan kekuatan otot ekstremitas superior dan inferior dextra (MMT 3/5), spastisitas fleksor siku MAS 1+, gangguan keseimbangan dinamis.',
-    bodyStructure: 'Hemisfer serebri sinistra (traktus kortikospinalis), sendi ankle & shoulder dextra.',
-    activityLimitation: 'Keterbatasan ambulasi mandiri, butuh bantuan alat bantu quadripod cane dan pendamping saat berjalan > 15 meter.',
-    participationRestriction: 'Belum mampu menghadiri pertemuan keluarga besar atau rekreasi luar rumah secara mandiri.',
-    personalFactor: 'Pria usia 67 tahun, pensiunan PNS, sangat bersemangat dan kooperatif dengan latihan.',
-    environmentalFactor: 'Rumah lantai 1 tanpa undakan, toilet sudah dipasangi pegangan tangan (grab bar) oleh keluarga.',
-    vitalSigns: {
-      bloodPressure: '135/85',
-      heartRate: 78,
-      respiratoryRate: 19,
-      spo2: 99,
-      temperature: 36.4,
-      height: 168,
-      weight: 64,
-      bmi: 22.7,
-      bmiCategory: 'Normal / Ideal',
-    },
-    additionalNotes: 'Onset stroke 2 bulan lalu, tensi rutin dipantau',
-    createdAt: '2026-08-10T10:00:00.000Z',
-    updatedAt: '2026-08-27T09:00:00.000Z',
-    totalVisits: 5,
-    lastVisitDate: '2026-08-27',
-    lastLocation: 'Home Care',
-    lastTherapist: 'Bintang',
-    totalSpending: 1175000,
-    outstandingBalance: 0,
-    lastPaymentStatus: 'Lunas',
-  },
-  {
-    id: 'p-seed-4',
-    mrn: 'RM-00004',
-    fullName: 'Dewi Lestari',
-    dob: '1995-08-04',
-    age: 31,
-    gender: 'P',
-    phone: '085712345678',
-    address: 'Apartemen Menteng Square Tower A, Lt 12',
-    diagnosis: 'Post Rekonstruksi ACL Dextra (Week 6 Post-Op)',
-    mainComplaint: 'Defisit ekstensi penuh lutut kanan, atrofi m. quadriceps',
-    currentMedicalHistory: 'Cedera ligamen ACL dialami saat bermain bulutangkis 3 bulan lalu. Tindakan rekonstruksi arthroskopi dilakukan 6 minggu lalu, saat ini fase penguatan dan pemulihan fungsional.',
-    bodyFunction: 'Defisit ekstensi lutut kanan 5°, ROM fleksi 85°, kelemahan otot quadriceps (MMT 3/5), efusi intraartikular minimal.',
-    bodyStructure: 'Graft ACL dextra (hamstring tendon autograft), patella dan sendi tibiofemoralis dextra.',
-    activityLimitation: 'Kesulitan menuruni tangga dan belum diizinkan berlari / melompat (cutting movement).',
-    participationRestriction: 'Belum dapat kembali berkompetisi bulutangkis komunitas.',
-    personalFactor: 'Wanita usia 31 tahun, atlet amatir, disiplin tinggi terhadap home program.',
-    environmentalFactor: 'Akses lift apartemen lancar, memiliki fasilitas gym di gedung untuk latihan beban.',
-    vitalSigns: {
-      bloodPressure: '110/70',
-      heartRate: 68,
-      respiratoryRate: 16,
-      spo2: 99,
-      temperature: 36.5,
-      height: 165,
-      weight: 54,
-      bmi: 19.8,
-      bmiCategory: 'Normal / Ideal',
-    },
-    additionalNotes: 'Atlet bulutangkis amatir, target return to sport',
-    createdAt: '2026-08-15T11:00:00.000Z',
-    updatedAt: '2026-08-24T16:00:00.000Z',
-    totalVisits: 2,
-    lastVisitDate: '2026-08-24',
-    lastLocation: 'Klinik',
-    lastTherapist: 'Dimas',
-    totalSpending: 300000,
-    outstandingBalance: 0,
-    lastPaymentStatus: 'Lunas',
-  },
-  {
-    id: 'p-seed-5',
-    mrn: 'RM-00005',
-    fullName: 'Agus Pratama',
-    dob: '1988-02-14',
-    age: 38,
-    gender: 'L',
-    phone: '087812987654',
-    address: 'Jl. Danau Sunter Barat No. 5',
-    diagnosis: 'Cervical Root Syndrome / Radikulopati Servikal C5-C6',
-    mainComplaint: 'Nyeri leher menjalar ke bahu dan lengan kanan, kesemutan di ibu jari',
-    currentMedicalHistory: 'Nyeri leher kanan menusuk dan kesemutan muncul mendadak 5 hari lalu setelah bekerja lembur menatap monitor laptop dengan posisi menunduk lama.',
-    bodyFunction: 'Spurling test positif dextra, spasme m. upper trapezius dan m. levator scapulae dextra, ROM rotasi servikal dextra terbatas nyeri VAS 7/10.',
-    bodyStructure: 'Foramen intervertebralis servikal C5-C6 dextra, diskus servikalis, radiks saraf C6.',
-    activityLimitation: 'Sulit menoleh ke kanan saat mengemudi kendaraan bermotor, nyeri saat menunduk menatap ponsel.',
-    participationRestriction: 'Terganggu fokus kerja pemrograman komputer dan terhambat saat mengendarai mobil.',
-    personalFactor: 'Pria usia 38 tahun, software engineer, kebiasaan postur forward head posture.',
-    environmentalFactor: 'Posisi monitor laptop terlalu rendah, belum memakai stand laptop eksternal.',
-    vitalSigns: {
-      bloodPressure: '120/80',
-      heartRate: 75,
-      respiratoryRate: 18,
-      spo2: 98,
-      temperature: 36.6,
-      height: 172,
-      weight: 80,
-      bmi: 27.0,
-      bmiCategory: 'Obesitas',
-    },
-    additionalNotes: 'Pekerjaan IT software engineer',
-    createdAt: '2026-08-18T13:00:00.000Z',
-    updatedAt: '2026-08-27T10:30:00.000Z',
-    totalVisits: 1,
-    lastVisitDate: '2026-08-27',
-    lastLocation: 'Home Care',
-    lastTherapist: 'Bintang',
-    totalSpending: 235000,
-    outstandingBalance: 0,
-    lastPaymentStatus: 'Lunas',
-  }
-];
-
-const SEED_VISITS: TherapyVisit[] = [
-  // Bambang Supriyanto visits
-  {
-    id: 'v-seed-1',
-    patientId: 'p-seed-1',
-    patientName: 'Bambang Supriyanto',
-    mrn: 'RM-00001',
-    visitNumber: 1,
-    date: '2026-08-01',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['IR', 'TENS', 'Massage', 'Stretching'],
-    soap: {
-      subjective: 'Pasien mengeluh nyeri punggung bawah sejak 2 minggu lalu. Nyeri tajam menjalar ke paha dan betis kanan. VAS diam 3/10, VAS gerak 7/10.',
-      objective: 'SLR test (+) 45° dextra. Spasme m. erector spinae lumbal, m. piriformis (+). ROM fleksi lumbal terbatas nyeri.',
-      assessment: 'Impairment nyeri dan keterbatasan gerak lumbal e.c. HNP L4-L5 susp radikulopati.',
-      plan: 'IR lumbal 15 mnt, TENS konvensional 15 mnt, myofascial release gluteal & piriformis, gentle hamstring & piriformis stretching. Edukasi postur duduk.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-      notes: 'Transfer BCA',
-    },
-    createdAt: '2026-08-01T08:30:00.000Z',
-    updatedAt: '2026-08-01T08:30:00.000Z',
-  },
-  {
-    id: 'v-seed-2',
-    patientId: 'p-seed-1',
-    patientName: 'Bambang Supriyanto',
-    mrn: 'RM-00001',
-    visitNumber: 2,
-    date: '2026-08-12',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['IR', 'TENS', 'Massage', 'Stretching', 'Core Exercise'],
-    soap: {
-      subjective: 'Nyeri berkurang, VAS diam 1/10, VAS gerak 4/10. Penjalaran ke betis sudah minimal. Duduk 1 jam terasa jauh lebih nyaman.',
-      objective: 'SLR test (+) 65° dextra. Spasme lumbal menurun. Mobilitas lumbal membaik.',
-      assessment: 'Progres positif, penurunan intensitas nyeri dan peningkatan toleransi aktivitas duduk.',
-      plan: 'Lanjutkan IR + TENS, latihan stabilisasi core (pelvic tilt, bird-dog ringan, bridging), peregangan lower extremity.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-      notes: 'Tunai',
-    },
-    createdAt: '2026-08-12T09:00:00.000Z',
-    updatedAt: '2026-08-12T09:00:00.000Z',
-  },
-  {
-    id: 'v-seed-3',
-    patientId: 'p-seed-1',
-    patientName: 'Bambang Supriyanto',
-    mrn: 'RM-00001',
-    visitNumber: 3,
-    date: '2026-08-25',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['TENS', 'Massage', 'Stretching', 'Strengthening Exercise', 'Core Exercise'],
-    soap: {
-      subjective: 'Pasien merasa jauh lebih bugar. Nyeri menjalar sudah hilang total. Hanya pegal ringan setelah lembur.',
-      objective: 'SLR (-) 80°. ROM lumbal full, MMT core 4/5. Kekuatan otot gluteus membaik.',
-      assessment: 'Pemulihan fungsional tercapai > 80%. Stabilitas lumbopelvic stabil.',
-      plan: 'Program penguatan fungsional lanjut, dead-bug exercise, plank modifikasi, home exercise maintenance 3x seminggu.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-      notes: 'QRIS',
-    },
-    createdAt: '2026-08-25T10:00:00.000Z',
-    updatedAt: '2026-08-25T10:00:00.000Z',
-  },
-
-  // Siti Rahmawati visits
-  {
-    id: 'v-seed-4',
-    patientId: 'p-seed-2',
-    patientName: 'Siti Rahmawati',
-    mrn: 'RM-00002',
-    visitNumber: 1,
-    date: '2026-08-05',
-    location: 'Klinik',
-    therapist: 'Bintang',
-    interventions: ['IR', 'US', 'Massage', 'PROM', 'Stretching'],
-    soap: {
-      subjective: 'Nyeri dan kaku bahu kiri sejak 1 bulan, makin berat saat tidur miring ke kiri. VAS 6/10.',
-      objective: 'Kapsular pattern (+). ROM fleksi bahu kiri 100°, abduksi 85°, eksorotasi 20°. End-feel firm capsular.',
-      assessment: 'Adhesive Capsulitis Sinistra fase freezing/frozen.',
-      plan: 'IR 15 mnt, US kontinuitas 1.5 W/cm2 pada anterior & posterior kapsul, mobilisasi sendi glenohumeral grade II-III, codman pendulum exercise, finger ladder.',
-    },
-    payment: {
-      therapyPrice: 150000,
-      transport: 0,
-      discount: 0,
-      total: 150000,
-      status: 'Lunas',
-      paidAmount: 150000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-05T09:30:00.000Z',
-    updatedAt: '2026-08-05T09:30:00.000Z',
-  },
-  {
-    id: 'v-seed-5',
-    patientId: 'p-seed-2',
-    patientName: 'Siti Rahmawati',
-    mrn: 'RM-00002',
-    visitNumber: 2,
-    date: '2026-08-12',
-    location: 'Klinik',
-    therapist: 'Bintang',
-    interventions: ['IR', 'US', 'PROM', 'AROM', 'Stretching'],
-    soap: {
-      subjective: 'Nyeri malam hari berkurang, sudah bisa tidur lebih nyenyak.',
-      objective: 'ROM fleksi 115°, abduksi 100°, eksorotasi 30°. Nyeri akhir gerak VAS 4/10.',
-      assessment: 'Peningkatan ROM bertahap dan penurunan nyeri istirahat.',
-      plan: 'Lanjutkan US & mobilisasi glenohumeral, latihan active assisted tongkat, peregangan kapsul posterior.',
-    },
-    payment: {
-      therapyPrice: 150000,
-      transport: 0,
-      discount: 0,
-      total: 150000,
-      status: 'Lunas',
-      paidAmount: 150000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-12T10:00:00.000Z',
-    updatedAt: '2026-08-12T10:00:00.000Z',
-  },
-  {
-    id: 'v-seed-6',
-    patientId: 'p-seed-2',
-    patientName: 'Siti Rahmawati',
-    mrn: 'RM-00002',
-    visitNumber: 3,
-    date: '2026-08-19',
-    location: 'Klinik',
-    therapist: 'Bintang',
-    interventions: ['US', 'Massage', 'PROM', 'AROM', 'Strengthening Exercise'],
-    soap: {
-      subjective: 'Pasien sudah bisa mengenakan baju sendiri tanpa bantuan signifikan.',
-      objective: 'ROM fleksi 135°, abduksi 125°, eksorotasi 45°. Kekuatan rotator cuff 3+/5.',
-      assessment: 'Fase thawing, mobilitas fungsional membaik nyata.',
-      plan: 'US bicipital & subscapular, perbaikan scapulohumeral rhythm, latihan theraband ringan rotasi eksterna.',
-    },
-    payment: {
-      therapyPrice: 150000,
-      transport: 0,
-      discount: 0,
-      total: 150000,
-      status: 'Lunas',
-      paidAmount: 150000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-19T10:30:00.000Z',
-    updatedAt: '2026-08-19T10:30:00.000Z',
-  },
-  {
-    id: 'v-seed-7',
-    patientId: 'p-seed-2',
-    patientName: 'Siti Rahmawati',
-    mrn: 'RM-00002',
-    visitNumber: 4,
-    date: '2026-08-26',
-    location: 'Klinik',
-    therapist: 'Bintang',
-    interventions: ['US', 'Massage', 'PNF', 'Strengthening Exercise'],
-    soap: {
-      subjective: 'Keluhan kaku jauh berkurang, mampu menyisir rambut dan meraih benda di atas lemari.',
-      objective: 'ROM fleksi 160°, abduksi 150°, eksorotasi 65°. Scapular dyskinesis minimal.',
-      assessment: 'Target mobilitas fungsional tercapai > 90%.',
-      plan: 'PNF pattern D2 fleksi-abduksi-eksorotasi, strengthening rotator cuff & periscapular, edukasi postur.',
-    },
-    payment: {
-      therapyPrice: 150000,
-      transport: 0,
-      discount: 0,
-      total: 150000,
-      status: 'DP',
-      paidAmount: 0,
-      remainingBalance: 150000,
-      notes: 'DP Kunjungan paket, sisa diselesaikan minggu depan',
-    },
-    createdAt: '2026-08-26T14:30:00.000Z',
-    updatedAt: '2026-08-26T14:30:00.000Z',
-  },
-
-  // Hendro Wijaya (Stroke) visits
-  {
-    id: 'v-seed-8',
-    patientId: 'p-seed-3',
-    patientName: 'Hendro Wijaya',
-    mrn: 'RM-00003',
-    visitNumber: 1,
-    date: '2026-08-10',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['Bobath', 'PNF', 'PROM', 'AROM', 'Breathing Exercise'],
-    soap: {
-      subjective: 'Keluarga menyatakan pasien kesulitan berdiri dari kursi roda dan tangan kanan lemah.',
-      objective: 'BBS (Berg Balance Scale) 22/56. MMT extremitas superior dextra 2/5, inferior 3/5. Spastisitas m. biceps MAS 1+.',
-      assessment: 'Hemiparese dextra e.c. Stroke Non-Hemoragik dengan gangguan transfer & keseimbangan duduk-ke-berdiri.',
-      plan: 'Pendekatan Bobath (inhibisi spastisitas, fasilitasi weight bearing kanan), latihan sit-to-stand terkontrol, edukasi keluarga positioning di tempat tidur.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-10T10:30:00.000Z',
-    updatedAt: '2026-08-10T10:30:00.000Z',
-  },
-  {
-    id: 'v-seed-9',
-    patientId: 'p-seed-3',
-    patientName: 'Hendro Wijaya',
-    mrn: 'RM-00003',
-    visitNumber: 2,
-    date: '2026-08-14',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['Bobath', 'PNF', 'Strengthening Exercise', 'Core Exercise'],
-    soap: {
-      subjective: 'Pasien mulai bisa menumpu berat badan di kaki kanan saat mandi didampingi.',
-      objective: 'Kontrol trunk statis dan dinamis membaik. MMT tungkai kanan 3+/5.',
-      assessment: 'Peningkatan kontrol postural dan motorik ekstremitas bawah.',
-      plan: 'Latihan stepping forward/backward, weight shift latihan berdiri di paralel bar/kursi, stimulasi dorsofleksi ankle kanan.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-14T11:00:00.000Z',
-    updatedAt: '2026-08-14T11:00:00.000Z',
-  },
-  {
-    id: 'v-seed-10',
-    patientId: 'p-seed-3',
-    patientName: 'Hendro Wijaya',
-    mrn: 'RM-00003',
-    visitNumber: 3,
-    date: '2026-08-18',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['Bobath', 'PNF', 'Strengthening Exercise', 'AROM'],
-    soap: {
-      subjective: 'Pasien mulai latihan jalan di dalam rumah dengan quadripod cane (tongkat kaki 4).',
-      objective: 'Pola jalan hemiplegik berkurang, hip circumduction minimal. BBS 34/56.',
-      assessment: 'Peningkatan kemandirian ambulasi dengan alat bantu.',
-      plan: 'Gait training koreksi fase stance kanan, stimulasi grasping & releasing tangan kanan, PNF arm pattern.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-18T10:00:00.000Z',
-    updatedAt: '2026-08-18T10:00:00.000Z',
-  },
-  {
-    id: 'v-seed-11',
-    patientId: 'p-seed-3',
-    patientName: 'Hendro Wijaya',
-    mrn: 'RM-00003',
-    visitNumber: 4,
-    date: '2026-08-22',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['Bobath', 'PNF', 'Strengthening Exercise', 'Tapping'],
-    soap: {
-      subjective: 'Pasien jalan 20 meter mandiri diawasi keluarga. Koordinasi lengan kanan mulai aktif.',
-      objective: 'MMT deltoid & biceps 3+/5, hand grip 3/5. Keseimbangan dinamis meningkat.',
-      assessment: 'Progres pemulihan motorik tahap IV Brunnstrom.',
-      plan: 'Kinesio taping stabilisasi bahu kanan, fine motor training, rintangan jalan kecil untuk stepping control.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-22T10:30:00.000Z',
-    updatedAt: '2026-08-22T10:30:00.000Z',
-  },
-  {
-    id: 'v-seed-12',
-    patientId: 'p-seed-3',
-    patientName: 'Hendro Wijaya',
-    mrn: 'RM-00003',
-    visitNumber: 5,
-    date: '2026-08-27',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['Bobath', 'PNF', 'Strengthening Exercise', 'Breathing Exercise'],
-    soap: {
-      subjective: 'Pasien merasa semangat, sudah dapat berjalan ke teras rumah sendiri.',
-      objective: 'BBS 42/56. Pola transfer mandiri. Fleksi elbow dan ekstensi wrist aktif.',
-      assessment: 'Fungsi ambulasi mandiri dan aktivitas hidup harian (ADL) membaik signifikan.',
-      plan: 'Latihan naik-turun tangga satu step dengan rail, task-oriented functional training, home exercise rutin.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-27T09:00:00.000Z',
-    updatedAt: '2026-08-27T09:00:00.000Z',
-  },
-
-  // Dewi Lestari (ACL Post-Op)
-  {
-    id: 'v-seed-13',
-    patientId: 'p-seed-4',
-    patientName: 'Dewi Lestari',
-    mrn: 'RM-00004',
-    visitNumber: 1,
-    date: '2026-08-15',
-    location: 'Klinik',
-    therapist: 'Dimas',
-    interventions: ['TENS', 'US', 'Strengthening Exercise', 'PROM', 'Kompres Es'],
-    soap: {
-      subjective: 'Post operasi ACL 4 minggu lalu. Masih ada bengkak ringan, lutut kaku saat ditekuk.',
-      objective: 'ROM lutut fleksi 85°, ekstensi -5° (defisit 5°). Lingkar sendi +1 cm vs sisi sehat. MMT quad 3/5.',
-      assessment: 'Post Op ACL Reconstruction Hamstring Autograft fase II.',
-      plan: 'Cryotherapy + TENS, patellar mobilization superior/inferior, prone hang untuk ekstensi penuh, heel slides, SLR quad set.',
-    },
-    payment: {
-      therapyPrice: 150000,
-      transport: 0,
-      discount: 0,
-      total: 150000,
-      status: 'Lunas',
-      paidAmount: 150000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-15T11:30:00.000Z',
-    updatedAt: '2026-08-15T11:30:00.000Z',
-  },
-  {
-    id: 'v-seed-14',
-    patientId: 'p-seed-4',
-    patientName: 'Dewi Lestari',
-    mrn: 'RM-00004',
-    visitNumber: 2,
-    date: '2026-08-24',
-    location: 'Klinik',
-    therapist: 'Dimas',
-    interventions: ['TENS', 'Strengthening Exercise', 'AROM', 'Kompres Es'],
-    soap: {
-      subjective: 'Bengkak hilang, fleksi sudah terasa lebih leluasa.',
-      objective: 'ROM fleksi 115°, ekstensi 0° (simetris). Quad lag (-). MMT quad 4/5.',
-      assessment: 'Ekstensi penuh tercapai, kontrol quadriceps baik.',
-      plan: 'Stationary bike tanpa resistensi 10 mnt, closed kinetic chain (leg press beban ringan, wall squat 45°), proprioceptive balance board.',
-    },
-    payment: {
-      therapyPrice: 150000,
-      transport: 0,
-      discount: 0,
-      total: 150000,
-      status: 'Lunas',
-      paidAmount: 150000,
-      remainingBalance: 0,
-    },
-    createdAt: '2026-08-24T16:00:00.000Z',
-    updatedAt: '2026-08-24T16:00:00.000Z',
-  },
-
-  // Agus Pratama (Cervical)
-  {
-    id: 'v-seed-15',
-    patientId: 'p-seed-5',
-    patientName: 'Agus Pratama',
-    mrn: 'RM-00005',
-    visitNumber: 1,
-    date: '2026-08-27',
-    location: 'Home Care',
-    therapist: 'Bintang',
-    interventions: ['IR', 'TENS', 'Massage', 'Stretching', 'Tapping'],
-    soap: {
-      subjective: 'Nyeri leher kanan menusuk menjalar ke bahu dan ibu jari sejak 5 hari lalu. Sulit menoleh ke kanan saat berkendara. VAS 7/10.',
-      objective: 'Spurling test (+) dextra, Distraction test (+) meredakan nyeri. Spasme berat m. upper trapezius & levator scapulae dextra. ROM rotasi servikal dextra 30°.',
-      assessment: 'Cervical Root Syndrome C5-C6 dextra susp disc protrusion.',
-      plan: 'IR servikal posterior 15 mnt, TENS servikobrakialis 15 mnt, deep friction massage trapezius, gentle manual traction servikal, chin-tuck exercise, kinesio tape decompressive.',
-    },
-    payment: {
-      therapyPrice: 200000,
-      transport: 35000,
-      discount: 0,
-      total: 235000,
-      status: 'Lunas',
-      paidAmount: 235000,
-      remainingBalance: 0,
-      notes: 'Transfer Bank Jago',
-    },
-    createdAt: '2026-08-27T10:30:00.000Z',
-    updatedAt: '2026-08-27T10:30:00.000Z',
-  }
-];
+// Clean initial state: 0 patients
+const SEED_PATIENTS: Patient[] = [];
+const SEED_VISITS: TherapyVisit[] = [];
 
 class DatabaseService {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -786,62 +133,42 @@ class DatabaseService {
     };
   }
 
-  // Initializer: check Firestore first, seed if empty
+  // Initializer: ensure default settings exist and remove any sample patient data
   async init(): Promise<void> {
     if (isFirebaseReady && db) {
       try {
-        const snap = await getDocs(collection(db, 'patients'));
-        if (snap.empty) {
-          console.log('Firebase Firestore is connected and empty. Seeding initial data...');
-          await this.seedDataToFirestore();
+        // Ensure default settings exist in Firestore
+        const sDoc = await getDoc(doc(db, 'settings', 'app_settings'));
+        if (!sDoc.exists()) {
+          await setDoc(doc(db, 'settings', 'app_settings'), cleanForFirestore({ id: 'app_settings', ...DEFAULT_SETTINGS }));
         }
-        return;
+
+        // Clean out any legacy seed sample patients from Firestore
+        const pSnap = await getDocs(collection(db, 'patients'));
+        const seedPatientDocs = pSnap.docs.filter((d) => d.id.startsWith('p-seed-'));
+        if (seedPatientDocs.length > 0) {
+          const batch = writeBatch(db);
+          for (const d of seedPatientDocs) {
+            batch.delete(d.ref);
+          }
+          await batch.commit();
+        }
+
+        // Clean out any legacy seed sample visits from Firestore
+        const vSnap = await getDocs(collection(db, 'visits'));
+        const seedVisitDocs = vSnap.docs.filter((d) => d.id.startsWith('v-seed-') || d.data().patientId?.startsWith('p-seed-'));
+        if (seedVisitDocs.length > 0) {
+          const batch = writeBatch(db);
+          for (const d of seedVisitDocs) {
+            batch.delete(d.ref);
+          }
+          await batch.commit();
+        }
       } catch (err) {
-        console.warn('Firestore initial check error, checking local fallback:', err);
+        console.warn('Firestore initial check/cleanup error:', err);
       }
     }
 
-    try {
-      const localDb = await this.getDB();
-      const patients = await this.getAllPatients();
-      if (patients.length === 0) {
-        await this.seedData();
-      }
-    } catch (e) {
-      console.warn('Using LocalStorage fallback for B Fisio App:', e);
-      if (!localStorage.getItem('bfisio_patients')) {
-        localStorage.setItem('bfisio_patients', JSON.stringify(SEED_PATIENTS));
-        localStorage.setItem('bfisio_visits', JSON.stringify(SEED_VISITS));
-        localStorage.setItem('bfisio_settings', JSON.stringify(DEFAULT_SETTINGS));
-      }
-    }
-  }
-
-  async seedDataToFirestore(): Promise<void> {
-    if (!isFirebaseReady || !db) return;
-    try {
-      const batch = writeBatch(db);
-      for (const p of SEED_PATIENTS) {
-        const pRef = doc(db, 'patients', p.id);
-        batch.set(pRef, cleanForFirestore(p));
-      }
-      for (const v of SEED_VISITS) {
-        const vRef = doc(db, 'visits', v.id);
-        batch.set(vRef, cleanForFirestore(v));
-      }
-      const sRef = doc(db, 'settings', 'app_settings');
-      batch.set(sRef, cleanForFirestore({ id: 'app_settings', ...DEFAULT_SETTINGS }));
-      await batch.commit();
-      console.log('Firebase Firestore seeded successfully!');
-    } catch (e) {
-      console.error('Error seeding Firebase Firestore:', e);
-    }
-  }
-
-  async seedData(): Promise<void> {
-    if (isFirebaseReady && db) {
-      await this.seedDataToFirestore();
-    }
     try {
       const localDb = await this.getDB();
       const tx = localDb.transaction(['patients', 'visits', 'settings'], 'readwrite');
@@ -849,23 +176,75 @@ class DatabaseService {
       const vStore = tx.objectStore('visits');
       const sStore = tx.objectStore('settings');
 
-      for (const p of SEED_PATIENTS) {
-        pStore.put(p);
-      }
-      for (const v of SEED_VISITS) {
-        vStore.put(v);
-      }
-      sStore.put({ id: 'app_settings', ...DEFAULT_SETTINGS });
+      // Ensure settings exist in IndexedDB
+      const sReq = sStore.get('app_settings');
+      sReq.onsuccess = () => {
+        if (!sReq.result) {
+          sStore.put({ id: 'app_settings', ...DEFAULT_SETTINGS });
+        }
+      };
 
-      return new Promise((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch {
-      localStorage.setItem('bfisio_patients', JSON.stringify(SEED_PATIENTS));
-      localStorage.setItem('bfisio_visits', JSON.stringify(SEED_VISITS));
-      localStorage.setItem('bfisio_settings', JSON.stringify(DEFAULT_SETTINGS));
+      // Remove any legacy seed patients from IndexedDB
+      const pReq = pStore.getAll();
+      pReq.onsuccess = () => {
+        const pts = pReq.result || [];
+        for (const p of pts) {
+          if (p.id?.startsWith('p-seed-')) {
+            pStore.delete(p.id);
+          }
+        }
+      };
+
+      // Remove any legacy seed visits from IndexedDB
+      const vReq = vStore.getAll();
+      vReq.onsuccess = () => {
+        const vsts = vReq.result || [];
+        for (const v of vsts) {
+          if (v.id?.startsWith('v-seed-') || v.patientId?.startsWith('p-seed-')) {
+            vStore.delete(v.id);
+          }
+        }
+      };
+    } catch (e) {
+      console.warn('IndexedDB check/cleanup error:', e);
     }
+
+    // Clean LocalStorage fallback
+    try {
+      const rawPts = localStorage.getItem('bfisio_patients');
+      if (rawPts) {
+        const pts = JSON.parse(rawPts);
+        const filtered = pts.filter((p: any) => !p.id?.startsWith('p-seed-'));
+        localStorage.setItem('bfisio_patients', JSON.stringify(filtered));
+      } else {
+        localStorage.setItem('bfisio_patients', JSON.stringify([]));
+      }
+
+      const rawVisits = localStorage.getItem('bfisio_visits');
+      if (rawVisits) {
+        const vsts = JSON.parse(rawVisits);
+        const filtered = vsts.filter((v: any) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
+        localStorage.setItem('bfisio_visits', JSON.stringify(filtered));
+      } else {
+        localStorage.setItem('bfisio_visits', JSON.stringify([]));
+      }
+
+      if (!localStorage.getItem('bfisio_settings')) {
+        localStorage.setItem('bfisio_settings', JSON.stringify(DEFAULT_SETTINGS));
+      }
+    } catch (e) {
+      console.warn('LocalStorage cleanup error:', e);
+    }
+  }
+
+  async seedDataToFirestore(): Promise<void> {
+    // No-op: Zero sample patient mode
+    return;
+  }
+
+  async seedData(): Promise<void> {
+    // No-op: Zero sample patient mode
+    return;
   }
 
   // Real-time listener for patients
@@ -1559,28 +938,42 @@ class DatabaseService {
     };
   }
 
-  // Reset demo
-  async resetToDemo(): Promise<void> {
+  // Clear all patient and visit data (0 patients)
+  async clearAllPatientData(): Promise<void> {
     if (isFirebaseReady && db) {
-      await this.seedDataToFirestore();
+      try {
+        const pSnap = await getDocs(collection(db, 'patients'));
+        const vSnap = await getDocs(collection(db, 'visits'));
+
+        const batch = writeBatch(db);
+        pSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+        vSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+        await batch.commit();
+      } catch (err) {
+        console.error('Error clearing Firestore patients/visits:', err);
+      }
     }
+
     try {
       const localDb = await this.getDB();
-      const tx = localDb.transaction(['patients', 'visits', 'settings'], 'readwrite');
+      const tx = localDb.transaction(['patients', 'visits'], 'readwrite');
       tx.objectStore('patients').clear();
       tx.objectStore('visits').clear();
-      for (const p of SEED_PATIENTS) {
-        tx.objectStore('patients').put(p);
-      }
-      for (const v of SEED_VISITS) {
-        tx.objectStore('visits').put(v);
-      }
-      tx.objectStore('settings').put({ id: 'app_settings', ...DEFAULT_SETTINGS });
-    } catch {
-      localStorage.setItem('bfisio_patients', JSON.stringify(SEED_PATIENTS));
-      localStorage.setItem('bfisio_visits', JSON.stringify(SEED_VISITS));
-      localStorage.setItem('bfisio_settings', JSON.stringify(DEFAULT_SETTINGS));
+    } catch (err) {
+      console.warn('IndexedDB clear error:', err);
     }
+
+    try {
+      localStorage.setItem('bfisio_patients', JSON.stringify([]));
+      localStorage.setItem('bfisio_visits', JSON.stringify([]));
+    } catch (err) {
+      console.warn('LocalStorage clear error:', err);
+    }
+  }
+
+  // Reset to empty database (0 patients)
+  async resetToDemo(): Promise<void> {
+    await this.clearAllPatientData();
   }
 }
 

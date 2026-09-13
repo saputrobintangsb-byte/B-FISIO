@@ -158,14 +158,14 @@ export const SettingsView: React.FC = () => {
     e.target.value = '';
   };
 
-  // Reset to Demo
+  // Reset / Kosongkan Data Pasien
   const handleResetDemo = async () => {
     try {
-      await dbService.resetToDemo();
+      await dbService.clearAllPatientData();
       await refreshData();
-      showToast('success', 'Data aplikasi berhasil direset ke data awal.', 'Reset Sukses');
+      showToast('success', 'Seluruh data pasien berhasil dikosongkan (0 Pasien).', 'Data Dikosongkan');
     } catch {
-      showToast('error', 'Gagal mereset data.', 'Error');
+      showToast('error', 'Gagal mengosongkan data pasien.', 'Error');
     } finally {
       setIsResetConfirmOpen(false);
     }
@@ -443,13 +443,14 @@ export const SettingsView: React.FC = () => {
             <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
           </label>
 
-          {/* Reset Demo */}
+          {/* Reset / Kosongkan Data Pasien */}
           <button
+            type="button"
             onClick={() => setIsResetConfirmOpen(true)}
             className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 active:scale-95 rounded-xl transition-all ml-auto"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Reset ke Data Demo Awal</span>
+            <span>Kosongkan Seluruh Data Pasien (0 Pasien)</span>
           </button>
         </div>
       </div>
@@ -457,9 +458,9 @@ export const SettingsView: React.FC = () => {
       {/* Reset Confirmation Modal */}
       <ConfirmationModal
         isOpen={isResetConfirmOpen}
-        title="Reset Data ke Awal"
-        message="Apakah Anda yakin ingin mereset seluruh database aplikasi ke data demo awal? Semua perubahan dan data pasien yang Anda buat akan ditimpa."
-        confirmLabel="Ya, Reset Database"
+        title="Kosongkan Seluruh Data Pasien"
+        message="Apakah Anda yakin ingin mengosongkan seluruh data pasien dan riwayat kunjungan menjadi 0 pasien? Tindakan ini akan menghapus seluruh data rekam medis pasien."
+        confirmLabel="Ya, Kosongkan Semua (0 Pasien)"
         cancelLabel="Batal"
         isDanger={true}
         onConfirm={handleResetDemo}
