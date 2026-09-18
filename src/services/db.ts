@@ -140,6 +140,26 @@ class DatabaseService {
     };
   }
 
+  // Helper to validate whether a patient record is valid and not a corrupt/blank bug record
+  isValidPatient(p: any): boolean {
+    if (!p || typeof p !== 'object') return false;
+    if (!p.id || typeof p.id !== 'string') return false;
+    if (p.id.startsWith('p-seed-')) return false;
+
+    const name = (p.fullName || '').trim();
+    const mrn = (p.mrn || '').trim();
+
+    // If both name and MRN are empty/blank, it's 100% a corrupted bug record
+    if (!name && !mrn) return false;
+
+    // A valid patient in clinical records must have a meaningful name
+    if (!name || name === '-' || name.toLowerCase() === 'undefined' || name.toLowerCase() === 'null' || name.toLowerCase() === 'tanpa nama') {
+      return false;
+    }
+
+    return true;
+  }
+
   // --- Local Storage & IndexedDB Helpers ---
   async getLocalPatients(): Promise<Patient[]> {
     try {
@@ -150,7 +170,7 @@ class DatabaseService {
         const req = store.getAll();
         req.onsuccess = () => {
           const list = (req.result as Patient[]) || [];
-          const filtered = list.filter((p) => !p.id?.startsWith('p-seed-'));
+          const filtered = list.filter((p) => this.isValidPatient(p));
           filtered.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
           resolve(filtered);
         };
@@ -159,7 +179,7 @@ class DatabaseService {
     } catch {
       const raw = localStorage.getItem('bfisio_patients');
       const list: Patient[] = raw ? JSON.parse(raw) : [];
-      const filtered = list.filter((p) => !p.id?.startsWith('p-seed-'));
+      const filtered = list.filter((p) => this.isValidPatient(p));
       filtered.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
       return filtered;
     }
@@ -259,8 +279,108 @@ class DatabaseService {
     }
   }
 
+  // Purge any corrupted, empty, or blank bug patients (without name or without MRN) from all storages
+  async purgeInvalidPatients(): Promise<{ deletedCount: number }> {
+    let deletedCount = 0;
+    const deletedPatientIds = new Set<string>();
+
+    // 1. Purge from Firestore
+    if (isFirebaseReady && db) {
+      try {
+        const pSnap = await getDocs(collection(db, 'patients'));
+        const invalidDocs = pSnap.docs.filter((d) => {
+          const data = d.data() as Partial<Patient>;
+          return !this.isValidPatient(data) || !d.id || d.id.startsWith('p-seed-');
+        });
+
+        if (invalidDocs.length > 0) {
+          const batch = writeBatch(db);
+          for (const docItem of invalidDocs) {
+            deletedPatientIds.add(docItem.id);
+            batch.delete(docItem.ref);
+            deletedCount++;
+          }
+
+          // Delete any visits linked to invalid patient IDs or orphaned visits
+          const vSnap = await getDocs(collection(db, 'visits'));
+          for (const vDoc of vSnap.docs) {
+            const vData = vDoc.data() as Partial<TherapyVisit>;
+            if (!vData.patientId || deletedPatientIds.has(vData.patientId) || vDoc.id?.startsWith('v-seed-')) {
+              batch.delete(vDoc.ref);
+            }
+          }
+
+          await batch.commit();
+          console.log(`[Firebase Cleanup] Berhasil menghapus ${deletedCount} data pasien bug/tanpa identitas dari Firestore.`);
+        }
+      } catch (err) {
+        console.error('Error purging invalid patients from Firestore:', err);
+      }
+    }
+
+    // 2. Purge from local IndexedDB
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction(['patients', 'visits'], 'readwrite');
+      const pStore = tx.objectStore('patients');
+      const vStore = tx.objectStore('visits');
+
+      const pReq = pStore.getAll();
+      pReq.onsuccess = () => {
+        const pts = pReq.result || [];
+        for (const p of pts) {
+          if (!this.isValidPatient(p)) {
+            deletedPatientIds.add(p.id);
+            pStore.delete(p.id);
+            deletedCount++;
+          }
+        }
+      };
+
+      const vReq = vStore.getAll();
+      vReq.onsuccess = () => {
+        const vsts = vReq.result || [];
+        for (const v of vsts) {
+          if (!v.patientId || deletedPatientIds.has(v.patientId) || v.id?.startsWith('v-seed-')) {
+            vStore.delete(v.id);
+          }
+        }
+      };
+    } catch (err) {
+      console.warn('Error purging invalid patients from IndexedDB:', err);
+    }
+
+    // 3. Purge from localStorage
+    try {
+      const rawPts = localStorage.getItem('bfisio_patients');
+      if (rawPts) {
+        const pts = JSON.parse(rawPts);
+        if (Array.isArray(pts)) {
+          const valid = pts.filter((p) => this.isValidPatient(p));
+          localStorage.setItem('bfisio_patients', JSON.stringify(valid));
+        }
+      }
+
+      const rawVisits = localStorage.getItem('bfisio_visits');
+      if (rawVisits) {
+        const vsts = JSON.parse(rawVisits);
+        if (Array.isArray(vsts)) {
+          const validVisits = vsts.filter((v) => v.patientId && !deletedPatientIds.has(v.patientId));
+          localStorage.setItem('bfisio_visits', JSON.stringify(validVisits));
+        }
+      }
+    } catch (err) {
+      console.warn('Error purging invalid patients from localStorage:', err);
+    }
+
+    return { deletedCount };
+  }
+
   // Initializer: smart bi-directional synchronization between local and Firestore
   async init(): Promise<void> {
+    // Automatically purge any bug/invalid patient data first
+    await this.purgeInvalidPatients();
+
     // 1. If Firebase is ready, ensure default settings & synchronize data
     if (isFirebaseReady && db) {
       try {
@@ -470,7 +590,7 @@ class DatabaseService {
           const list: Patient[] = [];
           snapshot.forEach((docSnap) => {
             const data = docSnap.data() as Patient;
-            if (!data.id?.startsWith('p-seed-')) {
+            if (this.isValidPatient(data)) {
               list.push(data);
             }
           });
@@ -578,8 +698,11 @@ class DatabaseService {
         const list: Patient[] = [];
         snap.forEach((docSnap) => {
           const p = docSnap.data() as Patient;
-          if (!p.id?.startsWith('p-seed-')) {
+          if (this.isValidPatient(p)) {
             list.push(p);
+          } else {
+            // Delete invalid corrupted doc asynchronously
+            deleteDoc(docSnap.ref).catch(() => {});
           }
         });
         list.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
@@ -608,7 +731,8 @@ class DatabaseService {
       try {
         const docSnap = await getDoc(doc(db, 'patients', id));
         if (docSnap.exists()) {
-          return docSnap.data() as Patient;
+          const p = docSnap.data() as Patient;
+          return this.isValidPatient(p) ? p : null;
         }
       } catch (err) {
         console.warn('Firestore getPatientById error:', err);
@@ -621,7 +745,10 @@ class DatabaseService {
         const tx = localDb.transaction('patients', 'readonly');
         const store = tx.objectStore('patients');
         const req = store.get(id);
-        req.onsuccess = () => resolve(req.result || null);
+        req.onsuccess = () => {
+          const p = req.result as Patient;
+          resolve(this.isValidPatient(p) ? p : null);
+        };
         req.onerror = () => reject(req.error);
       });
     } catch {
@@ -635,25 +762,25 @@ class DatabaseService {
     if (!queryStr || !queryStr.trim()) return list;
     const q = queryStr.toLowerCase().trim();
     return list.filter(p => 
-      p.fullName.toLowerCase().includes(q) ||
-      p.mrn.toLowerCase().includes(q) ||
-      p.phone.includes(q) ||
-      p.diagnosis.toLowerCase().includes(q) ||
-      p.address.toLowerCase().includes(q)
+      (p.fullName || '').toLowerCase().includes(q) ||
+      (p.mrn || '').toLowerCase().includes(q) ||
+      (p.phone || '').includes(q) ||
+      (p.diagnosis || '').toLowerCase().includes(q) ||
+      (p.address || '').toLowerCase().includes(q)
     );
   }
 
   // Duplicate patient detection
   async checkDuplicatePatient(fullName: string, phone: string, excludeId?: string): Promise<Patient | null> {
     const patients = await this.getAllPatients();
-    const cleanName = fullName.toLowerCase().trim();
-    const cleanPhone = phone.replace(/\D/g, '');
+    const cleanName = (fullName || '').toLowerCase().trim();
+    const cleanPhone = (phone || '').replace(/\D/g, '');
 
     for (const p of patients) {
       if (excludeId && p.id === excludeId) continue;
       
-      const pCleanName = p.fullName.toLowerCase().trim();
-      const pCleanPhone = p.phone.replace(/\D/g, '');
+      const pCleanName = (p.fullName || '').toLowerCase().trim();
+      const pCleanPhone = (p.phone || '').replace(/\D/g, '');
 
       // Check exact phone match or close name match
       if (cleanPhone && pCleanPhone && cleanPhone === pCleanPhone) {
@@ -684,10 +811,16 @@ class DatabaseService {
   }
 
   async savePatient(patient: Patient): Promise<Patient> {
+    const cleanName = (patient.fullName || '').trim();
+    if (!cleanName || cleanName === '-' || cleanName.toLowerCase() === 'undefined' || cleanName.toLowerCase() === 'null' || cleanName.toLowerCase() === 'tanpa nama') {
+      throw new Error('Nama pasien wajib diisi.');
+    }
+
     const finalPatient: Patient = {
       ...patient,
+      fullName: cleanName,
       id: patient.id || `p-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      mrn: patient.mrn || (await this.generateMRN()),
+      mrn: patient.mrn?.trim() || (await this.generateMRN()),
       createdAt: patient.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       totalVisits: patient.totalVisits ?? 0,

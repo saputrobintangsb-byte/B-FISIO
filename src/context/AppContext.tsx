@@ -89,6 +89,7 @@ interface AppContextType {
     localVisits: number;
     localAppointments: number;
   }>;
+  purgeInvalidPatients: () => Promise<number>;
 
   // Global Search
   globalSearch: string;
@@ -223,7 +224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dbService.getSettings(),
         dbService.getDashboardStats(),
       ]);
-      setPatients(pts);
+      setPatients(pts.filter((p) => p && (p.fullName?.trim() || p.mrn?.trim())));
       setVisits(vsts);
       setAppointments(appts);
       setSettingsState(stt);
@@ -248,7 +249,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsLoading(false);
 
       unsubPatients = dbService.subscribePatients((cloudPatients) => {
-        setPatients(cloudPatients);
+        setPatients(cloudPatients.filter((p) => p && (p.fullName?.trim() || p.mrn?.trim())));
       });
       unsubVisits = dbService.subscribeVisits((cloudVisits) => {
         setVisits(cloudVisits);
@@ -419,6 +420,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return await dbService.getDiagnostics();
   }, []);
 
+  const purgeInvalidPatients = useCallback(async () => {
+    const res = await dbService.purgeInvalidPatients();
+    await refreshData();
+    return res.deletedCount;
+  }, [refreshData]);
+
   return (
     <AppContext.Provider
       value={{
@@ -434,6 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stats,
         isLoading,
         refreshData,
+        purgeInvalidPatients,
         theme,
         setTheme,
         toasts,

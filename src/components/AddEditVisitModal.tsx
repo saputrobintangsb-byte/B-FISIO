@@ -202,14 +202,15 @@ export const AddEditVisitModal: React.FC = () => {
 
   // Search filtered patients for dropdown
   const filteredPatients = useMemo(() => {
-    if (!patientSearch.trim()) return patients.slice(0, 5);
+    const validPatients = patients.filter((p) => p && (p.fullName?.trim() || p.mrn?.trim()));
+    if (!patientSearch.trim()) return validPatients.slice(0, 5);
     const q = patientSearch.toLowerCase();
-    return patients.filter(
+    return validPatients.filter(
       (p) =>
-        p.fullName.toLowerCase().includes(q) ||
-        p.mrn.toLowerCase().includes(q) ||
-        p.phone.includes(q) ||
-        p.diagnosis.toLowerCase().includes(q)
+        (p.fullName || '').toLowerCase().includes(q) ||
+        (p.mrn || '').toLowerCase().includes(q) ||
+        (p.phone || '').includes(q) ||
+        (p.diagnosis || '').toLowerCase().includes(q)
     );
   }, [patients, patientSearch]);
 

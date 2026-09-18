@@ -39,7 +39,10 @@ export const SettingsView: React.FC = () => {
     pullCloudToLocal,
     testFirestoreConnection,
     getDiagnostics,
+    purgeInvalidPatients,
   } = useApp();
+
+  const [isPurging, setIsPurging] = useState(false);
 
   // Local state for editing settings
   const [clinicName, setClinicName] = useState(settings.clinicInfo?.name || 'B Fisio Care');
@@ -280,6 +283,25 @@ VITE_FIREBASE_DATABASE_ID=(default)`;
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  // Bersihkan Data Pasien Rusak (Tanpa Nama/RM)
+  const handlePurgeInvalidPatients = async () => {
+    setIsPurging(true);
+    try {
+      const deletedCount = await purgeInvalidPatients();
+      if (deletedCount > 0) {
+        showToast('success', `Berhasil menghapus ${deletedCount} data pasien yang rusak/tanpa nama dan RM.`, 'Pembersihan Selesai');
+      } else {
+        showToast('info', 'Database sudah bersih! Tidak ditemukan data pasien rusak tanpa nama atau tanpa RM.', 'Database Bersih');
+      }
+      const diagRes = await getDiagnostics();
+      setDiag(diagRes);
+    } catch {
+      showToast('error', 'Gagal membersihkan data pasien rusak.', 'Error');
+    } finally {
+      setIsPurging(false);
+    }
   };
 
   // Reset / Kosongkan Data Pasien
@@ -767,6 +789,17 @@ VITE_FIREBASE_DATABASE_ID=(default)`;
             <span>Pulihkan Database (Restore JSON)</span>
             <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
           </label>
+
+          {/* Bersihkan Data Pasien Rusak (Tanpa Nama/RM) */}
+          <button
+            type="button"
+            onClick={handlePurgeInvalidPatients}
+            disabled={isPurging}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 active:scale-95 rounded-xl transition-all disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>{isPurging ? 'Membersihkan...' : 'Bersihkan Data Pasien Rusak (Tanpa Nama/RM)'}</span>
+          </button>
 
           {/* Reset / Kosongkan Data Pasien */}
           <button

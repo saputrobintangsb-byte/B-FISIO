@@ -90,10 +90,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
     ? patients
         .filter(
           (p) =>
-            p.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.mrn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.phone.includes(searchQuery) ||
-            p.diagnosis.toLowerCase().includes(searchQuery.toLowerCase())
+            p &&
+            (p.fullName?.trim() || p.mrn?.trim()) &&
+            ((p.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (p.mrn || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (p.phone || '').includes(searchQuery) ||
+              (p.diagnosis || '').toLowerCase().includes(searchQuery.toLowerCase()))
         )
         .slice(0, 6)
     : [];

@@ -144,13 +144,14 @@ export const AddEditAppointmentModal: React.FC = () => {
 
   // Filtered patients for searchable select
   const filteredPatients = useMemo(() => {
-    if (!patientSearch.trim()) return patients;
+    const validPatients = patients.filter((p) => p && (p.fullName?.trim() || p.mrn?.trim()));
+    if (!patientSearch.trim()) return validPatients;
     const q = patientSearch.toLowerCase();
-    return patients.filter(
+    return validPatients.filter(
       (p) =>
-        p.fullName.toLowerCase().includes(q) ||
-        p.mrn.toLowerCase().includes(q) ||
-        p.phone.includes(q)
+        (p.fullName || '').toLowerCase().includes(q) ||
+        (p.mrn || '').toLowerCase().includes(q) ||
+        (p.phone || '').includes(q)
     );
   }, [patients, patientSearch]);
 

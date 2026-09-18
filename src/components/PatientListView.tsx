@@ -57,15 +57,18 @@ export const PatientListView: React.FC = () => {
   const filteredPatients = useMemo(() => {
     return patients
       .filter((p) => {
+        // Exclude invalid/bug patients
+        if (!p || (!p.fullName?.trim() && !p.mrn?.trim())) return false;
+
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
           const match =
-            p.fullName.toLowerCase().includes(q) ||
-            p.mrn.toLowerCase().includes(q) ||
-            p.phone.includes(q) ||
-            p.diagnosis.toLowerCase().includes(q) ||
-            p.address.toLowerCase().includes(q);
+            (p.fullName || '').toLowerCase().includes(q) ||
+            (p.mrn || '').toLowerCase().includes(q) ||
+            (p.phone || '').includes(q) ||
+            (p.diagnosis || '').toLowerCase().includes(q) ||
+            (p.address || '').toLowerCase().includes(q);
           if (!match) return false;
         }
 
@@ -359,16 +362,16 @@ export const PatientListView: React.FC = () => {
                         className="hover:bg-slate-50/80 dark:hover:bg-white/5 cursor-pointer transition-colors group"
                       >
                         <td className="py-3 px-4 font-bold text-[#001F3F] dark:text-white">
-                          <span>{p.fullName}</span>
+                          <span>{p.fullName || 'Tanpa Nama'}</span>
                         </td>
                         <td className="py-3 px-3 font-mono font-bold text-xs text-[#001F3F] dark:text-blue-300">
-                          {p.mrn}
+                          {p.mrn || '-'}
                         </td>
                         <td className="py-3 px-3 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                          {p.phone}
+                          {p.phone || '-'}
                         </td>
                         <td className="py-3 px-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                          {p.age} th ({p.gender})
+                          {p.age ?? 0} th ({p.gender || '-'})
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300 max-w-xs truncate" title={p.diagnosis}>
                           {p.diagnosis || '-'}
@@ -455,15 +458,15 @@ export const PatientListView: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                        {p.fullName}
+                        {p.fullName || 'Tanpa Nama'}
                       </h4>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-mono font-semibold text-blue-600 dark:text-blue-400">
-                          {p.mrn}
+                          {p.mrn || '-'}
                         </span>
                         <span className="text-xs text-slate-400">•</span>
                         <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {p.age} th ({p.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
+                          {p.age ?? 0} th ({p.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
                         </span>
                       </div>
                     </div>

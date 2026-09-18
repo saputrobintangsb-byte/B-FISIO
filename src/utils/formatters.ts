@@ -262,8 +262,8 @@ export function exportToCSV(patients: Patient[], filename: string = 'BFisio_Pasi
   ];
 
   const rows = patients.map(p => [
-    `"${p.mrn}"`,
-    `"${p.fullName.replace(/"/g, '""')}"`,
+    `"${p.mrn || '-'}"`,
+    `"${(p.fullName || 'Tanpa Nama').replace(/"/g, '""')}"`,
     p.gender === 'L' ? 'Laki-laki' : 'Perempuan',
     p.age,
     `"${p.phone}"`,
