@@ -70,6 +70,24 @@ interface AppContextType {
   openPrintModal: (patient: Patient) => void;
   closePrintModal: () => void;
 
+  // Settings
+  updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+
+  // Cloud Sync & Diagnostics
+  syncLocalToCloud: () => Promise<{ success: boolean; syncedPatients: number; syncedVisits: number; syncedAppointments: number }>;
+  pullCloudToLocal: () => Promise<{ success: boolean; patientsCount: number; visitsCount: number; appointmentsCount: number }>;
+  testFirestoreConnection: () => Promise<{ success: boolean; message: string; latencyMs: number }>;
+  getDiagnostics: () => Promise<{
+    isCloud: boolean;
+    projectId: string;
+    cloudPatients: number;
+    cloudVisits: number;
+    cloudAppointments: number;
+    localPatients: number;
+    localVisits: number;
+    localAppointments: number;
+  }>;
+
   // Global Search
   globalSearch: string;
   setGlobalSearch: (q: string) => void;
@@ -350,6 +368,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPrintPatient(null);
   }, []);
 
+  const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
+    const updated = await dbService.saveSettings(newSettings);
+    setSettingsState(updated);
+  }, []);
+
+  const syncLocalToCloud = useCallback(async () => {
+    const res = await dbService.syncLocalToCloud();
+    await refreshData();
+    return res;
+  }, [refreshData]);
+
+  const pullCloudToLocal = useCallback(async () => {
+    const res = await dbService.pullCloudToLocal();
+    await refreshData();
+    return res;
+  }, [refreshData]);
+
+  const testFirestoreConnection = useCallback(async () => {
+    return await dbService.testFirestoreConnection();
+  }, []);
+
+  const getDiagnostics = useCallback(async () => {
+    return await dbService.getDiagnostics();
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -396,6 +439,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         printPatient,
         openPrintModal,
         closePrintModal,
+        updateSettings,
+        syncLocalToCloud,
+        pullCloudToLocal,
+        testFirestoreConnection,
+        getDiagnostics,
         globalSearch,
         setGlobalSearch,
       }}

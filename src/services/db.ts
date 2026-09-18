@@ -134,13 +134,133 @@ class DatabaseService {
   getCloudStatus(): { isCloud: boolean; projectId: string; databaseId?: string } {
     return {
       isCloud: isFirebaseReady && !!db,
-      projectId: firebaseConfig?.projectId || 'Local',
+      projectId: firebaseConfig?.projectId || 'b-fisio-app',
       databaseId: firebaseConfig?.firestoreDatabaseId,
     };
   }
 
-  // Initializer: ensure default settings exist and remove any sample patient data
+  // --- Local Storage & IndexedDB Helpers ---
+  async getLocalPatients(): Promise<Patient[]> {
+    try {
+      const localDb = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = localDb.transaction('patients', 'readonly');
+        const store = tx.objectStore('patients');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const list = (req.result as Patient[]) || [];
+          const filtered = list.filter((p) => !p.id?.startsWith('p-seed-'));
+          filtered.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+          resolve(filtered);
+        };
+        req.onerror = () => resolve([]);
+      });
+    } catch {
+      const raw = localStorage.getItem('bfisio_patients');
+      const list: Patient[] = raw ? JSON.parse(raw) : [];
+      const filtered = list.filter((p) => !p.id?.startsWith('p-seed-'));
+      filtered.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+      return filtered;
+    }
+  }
+
+  async cacheLocalPatients(list: Patient[]): Promise<void> {
+    try {
+      localStorage.setItem('bfisio_patients', JSON.stringify(list));
+    } catch {}
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('patients', 'readwrite');
+      const store = tx.objectStore('patients');
+      for (const p of list) {
+        store.put(p);
+      }
+    } catch (e) {
+      console.warn('cacheLocalPatients error:', e);
+    }
+  }
+
+  async getLocalVisits(): Promise<TherapyVisit[]> {
+    try {
+      const localDb = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = localDb.transaction('visits', 'readonly');
+        const store = tx.objectStore('visits');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const list = (req.result as TherapyVisit[]) || [];
+          const filtered = list.filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
+          filtered.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+          resolve(filtered);
+        };
+        req.onerror = () => resolve([]);
+      });
+    } catch {
+      const raw = localStorage.getItem('bfisio_visits');
+      const list: TherapyVisit[] = raw ? JSON.parse(raw) : [];
+      const filtered = list.filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
+      filtered.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+      return filtered;
+    }
+  }
+
+  async cacheLocalVisits(list: TherapyVisit[]): Promise<void> {
+    try {
+      localStorage.setItem('bfisio_visits', JSON.stringify(list));
+    } catch {}
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('visits', 'readwrite');
+      const store = tx.objectStore('visits');
+      for (const v of list) {
+        store.put(v);
+      }
+    } catch (e) {
+      console.warn('cacheLocalVisits error:', e);
+    }
+  }
+
+  async getLocalAppointments(): Promise<Appointment[]> {
+    try {
+      const localDb = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = localDb.transaction('appointments', 'readonly');
+        const store = tx.objectStore('appointments');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const list = (req.result as Appointment[]) || [];
+          list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          resolve(list);
+        };
+        req.onerror = () => resolve([]);
+      });
+    } catch {
+      const raw = localStorage.getItem('bfisio_appointments');
+      const list: Appointment[] = raw ? JSON.parse(raw) : [];
+      list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+      return list;
+    }
+  }
+
+  async cacheLocalAppointments(list: Appointment[]): Promise<void> {
+    try {
+      localStorage.setItem('bfisio_appointments', JSON.stringify(list));
+    } catch {}
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('appointments', 'readwrite');
+      const store = tx.objectStore('appointments');
+      for (const a of list) {
+        store.put(a);
+      }
+    } catch (e) {
+      console.warn('cacheLocalAppointments error:', e);
+    }
+  }
+
+  // Initializer: smart bi-directional synchronization between local and Firestore
   async init(): Promise<void> {
+    // 1. If Firebase is ready, ensure default settings & synchronize data
     if (isFirebaseReady && db) {
       try {
         // Ensure default settings exist in Firestore
@@ -171,17 +291,56 @@ class DatabaseService {
           await batch.commit();
         }
 
-        // Clean out all calendar appointments from Firestore so calendar is completely empty (0 scheduled patients)
         const aSnap = await getDocs(collection(db, 'appointments'));
-        if (!aSnap.empty) {
-          const batch = writeBatch(db);
-          for (const d of aSnap.docs) {
-            batch.delete(d.ref);
+
+        // Smart Startup Sync: Upload any local items that don't exist in Firestore
+        const localPatients = await this.getLocalPatients();
+        const localVisits = await this.getLocalVisits();
+        const localAppts = await this.getLocalAppointments();
+
+        const cloudPatientIds = new Set(pSnap.docs.map((d) => d.id));
+        const cloudVisitIds = new Set(vSnap.docs.map((d) => d.id));
+        const cloudApptIds = new Set(aSnap.docs.map((d) => d.id));
+
+        const unsyncedPatients = localPatients.filter((p) => !cloudPatientIds.has(p.id) && !p.id.startsWith('p-seed-'));
+        const unsyncedVisits = localVisits.filter((v) => !cloudVisitIds.has(v.id) && !v.id.startsWith('v-seed-'));
+        const unsyncedAppts = localAppts.filter((a) => !cloudApptIds.has(a.id));
+
+        if (unsyncedPatients.length > 0 || unsyncedVisits.length > 0 || unsyncedAppts.length > 0) {
+          console.log(`[Firebase Sync] Auto-uploading unsynced local data to Firestore: ${unsyncedPatients.length} patients, ${unsyncedVisits.length} visits, ${unsyncedAppts.length} appts`);
+          const syncBatch = writeBatch(db);
+          for (const p of unsyncedPatients) {
+            syncBatch.set(doc(db, 'patients', p.id), cleanForFirestore(p));
           }
-          await batch.commit();
+          for (const v of unsyncedVisits) {
+            syncBatch.set(doc(db, 'visits', v.id), cleanForFirestore(v));
+          }
+          for (const a of unsyncedAppts) {
+            syncBatch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
+          }
+          await syncBatch.commit();
+        }
+
+        // Cache all cloud data locally so local storage is ready for offline
+        const validCloudPatients = pSnap.docs
+          .map((d) => d.data() as Patient)
+          .filter((p) => !p.id?.startsWith('p-seed-'));
+        const validCloudVisits = vSnap.docs
+          .map((d) => d.data() as TherapyVisit)
+          .filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
+        const validCloudAppts = aSnap.docs.map((d) => d.data() as Appointment);
+
+        if (validCloudPatients.length > 0) {
+          await this.cacheLocalPatients(validCloudPatients);
+        }
+        if (validCloudVisits.length > 0) {
+          await this.cacheLocalVisits(validCloudVisits);
+        }
+        if (validCloudAppts.length > 0) {
+          await this.cacheLocalAppointments(validCloudAppts);
         }
       } catch (err) {
-        console.warn('Firestore initial check/cleanup error:', err);
+        console.warn('Firestore initial check/sync error:', err);
       }
     }
 
@@ -190,11 +349,7 @@ class DatabaseService {
       const tx = localDb.transaction(['patients', 'visits', 'appointments', 'settings'], 'readwrite');
       const pStore = tx.objectStore('patients');
       const vStore = tx.objectStore('visits');
-      const aStore = tx.objectStore('appointments');
       const sStore = tx.objectStore('settings');
-
-      // Clear all appointments from IndexedDB to ensure empty calendar
-      aStore.clear();
 
       // Ensure settings exist in IndexedDB
       const sReq = sStore.get('app_settings');
@@ -236,8 +391,6 @@ class DatabaseService {
         const pts = JSON.parse(rawPts);
         const filtered = pts.filter((p: any) => !p.id?.startsWith('p-seed-'));
         localStorage.setItem('bfisio_patients', JSON.stringify(filtered));
-      } else {
-        localStorage.setItem('bfisio_patients', JSON.stringify([]));
       }
 
       const rawVisits = localStorage.getItem('bfisio_visits');
@@ -245,16 +398,11 @@ class DatabaseService {
         const vsts = JSON.parse(rawVisits);
         const filtered = vsts.filter((v: any) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
         localStorage.setItem('bfisio_visits', JSON.stringify(filtered));
-      } else {
-        localStorage.setItem('bfisio_visits', JSON.stringify([]));
       }
 
       if (!localStorage.getItem('bfisio_settings')) {
         localStorage.setItem('bfisio_settings', JSON.stringify(DEFAULT_SETTINGS));
       }
-
-      // Reset calendar appointments in LocalStorage to empty
-      localStorage.setItem('bfisio_appointments', JSON.stringify([]));
     } catch (e) {
       console.warn('LocalStorage cleanup error:', e);
     }
@@ -277,9 +425,13 @@ class DatabaseService {
         const unsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
           const list: Patient[] = [];
           snapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as Patient);
+            const data = docSnap.data() as Patient;
+            if (!data.id?.startsWith('p-seed-')) {
+              list.push(data);
+            }
           });
           list.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+          this.cacheLocalPatients(list);
           callback(list);
         }, (err) => {
           console.warn('Firestore subscribePatients snapshot error:', err);
@@ -299,9 +451,13 @@ class DatabaseService {
         const unsub = onSnapshot(collection(db, 'visits'), (snapshot) => {
           const list: TherapyVisit[] = [];
           snapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as TherapyVisit);
+            const data = docSnap.data() as TherapyVisit;
+            if (!data.id?.startsWith('v-seed-') && !data.patientId?.startsWith('p-seed-')) {
+              list.push(data);
+            }
           });
           list.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+          this.cacheLocalVisits(list);
           callback(list);
         }, (err) => {
           console.warn('Firestore subscribeVisits snapshot error:', err);
@@ -324,6 +480,7 @@ class DatabaseService {
             list.push(docSnap.data() as Appointment);
           });
           list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          this.cacheLocalAppointments(list);
           callback(list);
         }, (err) => {
           console.warn('Firestore subscribeAppointments snapshot error:', err);
@@ -343,37 +500,30 @@ class DatabaseService {
         const snap = await getDocs(collection(db, 'patients'));
         const list: Patient[] = [];
         snap.forEach((docSnap) => {
-          list.push(docSnap.data() as Patient);
+          const p = docSnap.data() as Patient;
+          if (!p.id?.startsWith('p-seed-')) {
+            list.push(p);
+          }
         });
         list.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
-        try {
-          localStorage.setItem('bfisio_patients', JSON.stringify(list));
-        } catch {}
-        return list;
+        if (list.length > 0) {
+          await this.cacheLocalPatients(list);
+          return list;
+        } else {
+          // If Firestore is empty, check if we have local unsynced patients
+          const localList = await this.getLocalPatients();
+          if (localList.length > 0) {
+            this.syncLocalToCloud().catch((err) => console.warn('Background sync error:', err));
+            return localList;
+          }
+          return [];
+        }
       } catch (err) {
         console.warn('Firestore getAllPatients error, reading local:', err);
       }
     }
 
-    try {
-      const localDb = await this.getDB();
-      return new Promise((resolve, reject) => {
-        const tx = localDb.transaction('patients', 'readonly');
-        const store = tx.objectStore('patients');
-        const req = store.getAll();
-        req.onsuccess = () => {
-          const list = req.result as Patient[];
-          list.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
-          resolve(list);
-        };
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      const raw = localStorage.getItem('bfisio_patients');
-      const list: Patient[] = raw ? JSON.parse(raw) : [];
-      list.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
-      return list;
-    }
+    return this.getLocalPatients();
   }
 
   async getPatientById(id: string): Promise<Patient | null> {
@@ -560,37 +710,29 @@ class DatabaseService {
         const snap = await getDocs(collection(db, 'visits'));
         const list: TherapyVisit[] = [];
         snap.forEach((docSnap) => {
-          list.push(docSnap.data() as TherapyVisit);
+          const v = docSnap.data() as TherapyVisit;
+          if (!v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-')) {
+            list.push(v);
+          }
         });
         list.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
-        try {
-          localStorage.setItem('bfisio_visits', JSON.stringify(list));
-        } catch {}
-        return list;
+        if (list.length > 0) {
+          await this.cacheLocalVisits(list);
+          return list;
+        } else {
+          const localList = await this.getLocalVisits();
+          if (localList.length > 0) {
+            this.syncLocalToCloud().catch((err) => console.warn('Background sync visits error:', err));
+            return localList;
+          }
+          return [];
+        }
       } catch (err) {
         console.warn('Firestore getAllVisits error, reading local:', err);
       }
     }
 
-    try {
-      const localDb = await this.getDB();
-      return new Promise((resolve, reject) => {
-        const tx = localDb.transaction('visits', 'readonly');
-        const store = tx.objectStore('visits');
-        const req = store.getAll();
-        req.onsuccess = () => {
-          const list = req.result as TherapyVisit[];
-          list.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
-          resolve(list);
-        };
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      const raw = localStorage.getItem('bfisio_visits');
-      const list: TherapyVisit[] = raw ? JSON.parse(raw) : [];
-      list.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
-      return list;
-    }
+    return this.getLocalVisits();
   }
 
   async getVisitsByPatient(patientId: string): Promise<TherapyVisit[]> {
@@ -757,38 +899,23 @@ class DatabaseService {
           list.push(docSnap.data() as Appointment);
         });
         list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
-        return list;
+        if (list.length > 0) {
+          await this.cacheLocalAppointments(list);
+          return list;
+        } else {
+          const localList = await this.getLocalAppointments();
+          if (localList.length > 0) {
+            this.syncLocalToCloud().catch((err) => console.warn('Background sync appointments error:', err));
+            return localList;
+          }
+          return [];
+        }
       } catch (err) {
         console.warn('Firestore getAllAppointments error, reading local:', err);
       }
     }
 
-    try {
-      const localDb = await this.getDB();
-      const tx = localDb.transaction('appointments', 'readonly');
-      const store = tx.objectStore('appointments');
-      const req = store.getAll();
-      return new Promise((resolve) => {
-        req.onsuccess = () => {
-          const res = (req.result as Appointment[]) || [];
-          res.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
-          resolve(res);
-        };
-        req.onerror = () => resolve([]);
-      });
-    } catch {
-      const raw = localStorage.getItem('bfisio_appointments');
-      if (raw) {
-        try {
-          const list = JSON.parse(raw) as Appointment[];
-          list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
-          return list;
-        } catch {
-          return [];
-        }
-      }
-      return [];
-    }
+    return this.getLocalAppointments();
   }
 
   async getAppointmentsByDate(date: string): Promise<Appointment[]> {
@@ -1154,14 +1281,14 @@ class DatabaseService {
     }
   }
 
-  // Force sync local to Firestore
-  async syncLocalToCloud(): Promise<{ success: boolean; syncedPatients: number; syncedVisits: number }> {
+  // Force sync local storage & IndexedDB to Firestore
+  async syncLocalToCloud(): Promise<{ success: boolean; syncedPatients: number; syncedVisits: number; syncedAppointments: number }> {
     if (!isFirebaseReady || !db) {
       throw new Error('Firebase Firestore belum terhubung.');
     }
-    const patients = await this.getAllPatients();
-    const visits = await this.getAllVisits();
-    const appointments = await this.getAllAppointments();
+    const patients = (await this.getLocalPatients()).filter((p) => !p.id?.startsWith('p-seed-'));
+    const visits = (await this.getLocalVisits()).filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
+    const appointments = await this.getLocalAppointments();
     const settings = await this.getSettings();
 
     const batch = writeBatch(db);
@@ -1181,6 +1308,122 @@ class DatabaseService {
       success: true,
       syncedPatients: patients.length,
       syncedVisits: visits.length,
+      syncedAppointments: appointments.length,
+    };
+  }
+
+  // Force pull from Firestore to update local storage & IndexedDB
+  async pullCloudToLocal(): Promise<{ success: boolean; patientsCount: number; visitsCount: number; appointmentsCount: number }> {
+    if (!isFirebaseReady || !db) {
+      throw new Error('Firebase Firestore belum terhubung.');
+    }
+    const pSnap = await getDocs(collection(db, 'patients'));
+    const vSnap = await getDocs(collection(db, 'visits'));
+    const aSnap = await getDocs(collection(db, 'appointments'));
+
+    const cloudPatients: Patient[] = [];
+    pSnap.forEach((d) => {
+      const p = d.data() as Patient;
+      if (!p.id?.startsWith('p-seed-')) cloudPatients.push(p);
+    });
+
+    const cloudVisits: TherapyVisit[] = [];
+    vSnap.forEach((d) => {
+      const v = d.data() as TherapyVisit;
+      if (!v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-')) cloudVisits.push(v);
+    });
+
+    const cloudAppointments: Appointment[] = [];
+    aSnap.forEach((d) => {
+      cloudAppointments.push(d.data() as Appointment);
+    });
+
+    cloudPatients.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+    cloudVisits.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+    cloudAppointments.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+
+    await this.cacheLocalPatients(cloudPatients);
+    await this.cacheLocalVisits(cloudVisits);
+    await this.cacheLocalAppointments(cloudAppointments);
+
+    return {
+      success: true,
+      patientsCount: cloudPatients.length,
+      visitsCount: cloudVisits.length,
+      appointmentsCount: cloudAppointments.length,
+    };
+  }
+
+  // Test live connection to Firestore (read + write test)
+  async testFirestoreConnection(): Promise<{ success: boolean; message: string; latencyMs: number }> {
+    if (!isFirebaseReady || !db) {
+      return {
+        success: false,
+        message: 'Firebase belum terkonfigurasi di browser ini atau kredensial belum terbaca.',
+        latencyMs: 0,
+      };
+    }
+    const start = performance.now();
+    try {
+      const testRef = doc(db, 'settings', 'live_sync_ping');
+      await setDoc(testRef, { lastPing: new Date().toISOString(), platform: 'Vercel / Web' });
+      await getDoc(testRef);
+      const latencyMs = Math.round(performance.now() - start);
+      return {
+        success: true,
+        message: `Koneksi Firestore aktif & responsif (${latencyMs} ms). Project: ${firebaseConfig?.projectId || 'b-fisio-app'}`,
+        latencyMs,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Gagal mengakses Firestore: ${err.message || err.code || 'Izin ditolak atau jaringan terputus'}`,
+        latencyMs: 0,
+      };
+    }
+  }
+
+  // Diagnostic status comparing Cloud vs Local data
+  async getDiagnostics(): Promise<{
+    isCloud: boolean;
+    projectId: string;
+    cloudPatients: number;
+    cloudVisits: number;
+    cloudAppointments: number;
+    localPatients: number;
+    localVisits: number;
+    localAppointments: number;
+  }> {
+    const localPatients = (await this.getLocalPatients()).filter((p) => !p.id.startsWith('p-seed-'));
+    const localVisits = (await this.getLocalVisits()).filter((v) => !v.id.startsWith('v-seed-'));
+    const localAppointments = await this.getLocalAppointments();
+
+    let cloudPatients = 0;
+    let cloudVisits = 0;
+    let cloudAppointments = 0;
+
+    if (isFirebaseReady && db) {
+      try {
+        const pSnap = await getDocs(collection(db, 'patients'));
+        cloudPatients = pSnap.docs.filter((d) => !d.id.startsWith('p-seed-')).length;
+        const vSnap = await getDocs(collection(db, 'visits'));
+        cloudVisits = vSnap.docs.filter((d) => !d.id.startsWith('v-seed-') && !d.data().patientId?.startsWith('p-seed-')).length;
+        const aSnap = await getDocs(collection(db, 'appointments'));
+        cloudAppointments = aSnap.size;
+      } catch (e) {
+        console.warn('Diagnostics cloud fetch error:', e);
+      }
+    }
+
+    return {
+      isCloud: isFirebaseReady && !!db,
+      projectId: firebaseConfig?.projectId || 'b-fisio-app',
+      cloudPatients,
+      cloudVisits,
+      cloudAppointments,
+      localPatients: localPatients.length,
+      localVisits: localVisits.length,
+      localAppointments: localAppointments.length,
     };
   }
 
