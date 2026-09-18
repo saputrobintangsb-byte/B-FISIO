@@ -11,6 +11,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Patient Appointments & Scheduling Collection
+    match /appointments/{appointmentId} {
+      allow read, write: if true;
+    }
+
     // Application Settings & Clinic Configurations
     match /settings/{settingId} {
       allow read, write: if true;

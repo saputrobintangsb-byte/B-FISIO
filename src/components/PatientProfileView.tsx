@@ -45,6 +45,8 @@ export const PatientProfileView: React.FC = () => {
     selectedPatientId,
     patients,
     visits,
+    appointments,
+    openAddAppointmentModal,
     setActiveView,
     openEditPatientModal,
     openAddVisitModal,
@@ -245,6 +247,14 @@ export const PatientProfileView: React.FC = () => {
           >
             <Edit2 className="w-4 h-4 text-slate-500" />
             <span>Edit Pasien</span>
+          </button>
+          <button
+            id="btn-schedule-patient-profile"
+            onClick={() => openAddAppointmentModal(undefined, undefined, patient.id)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 rounded-xl transition-colors shadow-xs"
+          >
+            <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span>+ Jadwalkan Terapi</span>
           </button>
           <button
             id="btn-add-visit-profile"

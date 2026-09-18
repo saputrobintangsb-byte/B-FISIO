@@ -140,6 +140,27 @@ export interface AppSettings {
   };
 }
 
+export type AppointmentStatus = 'Dijadwalkan' | 'Terkonfirmasi' | 'Selesai' | 'Batal';
+
+export interface Appointment {
+  id: string;
+  patientId: string;
+  patientName: string;
+  mrn: string;
+  patientPhone?: string;
+  date: string; // YYYY-MM-DD
+  time: string; // "06:00" to "21:00"
+  endTime?: string; // e.g. "07:00"
+  durationMinutes: number; // e.g. 60
+  location: TherapyLocation; // 'Home Care' | 'Klinik'
+  therapist: string;
+  status: AppointmentStatus;
+  complaintOrService?: string; // Layanan atau keluhan
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ToastNotification {
   id: string;
   type: 'success' | 'error' | 'info' | 'warning';
@@ -153,6 +174,7 @@ export type ActiveView =
   | 'patients'
   | 'patient-profile'
   | 'therapy-history'
+  | 'schedule'
   | 'reports'
   | 'settings'
   | 'add-patient';

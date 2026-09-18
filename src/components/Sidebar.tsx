@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard,
+  CalendarDays,
   Users2,
   CalendarCheck2,
   BarChart3,
@@ -23,10 +24,19 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) => {
-  const { activeView, setActiveView, theme, setTheme, showToast } = useApp();
+  const { activeView, setActiveView, appointments, theme, setTheme, showToast } = useApp();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayApptsCount = appointments?.filter((a) => a.date === todayStr && a.status !== 'Batal').length || 0;
 
   const navItems: { id: ActiveView; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4.5 h-4.5" /> },
+    {
+      id: 'schedule',
+      label: 'Jadwal & Kalender',
+      icon: <CalendarDays className="w-4.5 h-4.5" />,
+      badge: todayApptsCount > 0 ? `${todayApptsCount}` : undefined,
+    },
     { id: 'patients', label: 'Daftar Pasien', icon: <Users2 className="w-4.5 h-4.5" /> },
     { id: 'therapy-history', label: 'Riwayat Terapi', icon: <CalendarCheck2 className="w-4.5 h-4.5" /> },
     { id: 'reports', label: 'Laporan & Analitik', icon: <BarChart3 className="w-4.5 h-4.5" /> },

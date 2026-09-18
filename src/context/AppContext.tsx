@@ -7,6 +7,8 @@ import {
   ActiveView,
   DashboardStats,
   ThemeMode,
+  Appointment,
+  AppointmentStatus,
 } from '../types';
 import { dbService } from '../services/db';
 
@@ -21,6 +23,7 @@ interface AppContextType {
   // Data
   patients: Patient[];
   visits: TherapyVisit[];
+  appointments: Appointment[];
   settings: AppSettings;
   stats: DashboardStats | null;
   isLoading: boolean;
@@ -49,6 +52,18 @@ interface AppContextType {
   openEditVisitModal: (visit: TherapyVisit) => void;
   closeVisitModal: () => void;
 
+  // Appointment Modal
+  isAppointmentModalOpen: boolean;
+  editingAppointment: Appointment | null;
+  preselectedDateForAppointment: string | null;
+  preselectedTimeForAppointment: string | null;
+  preselectedPatientIdForAppointment: string | null;
+  openAddAppointmentModal: (date?: string, time?: string, patientId?: string) => void;
+  openEditAppointmentModal: (appt: Appointment) => void;
+  closeAppointmentModal: () => void;
+  deleteAppointment: (id: string) => Promise<void>;
+  updateAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
+
   isPrintModalOpen: boolean;
   printPatient: Patient | null;
   openPrintModal: (patient: Patient) => void;
@@ -67,6 +82,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [visits, setVisits] = useState<TherapyVisit[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>({
     defaultTherapist: 'Bintang',
     therapists: ['Bintang', 'Nurul', 'Dimas', 'Sarah'],
@@ -100,6 +116,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [editingVisit, setEditingVisit] = useState<TherapyVisit | null>(null);
   const [preselectedPatientForVisit, setPreselectedPatientForVisit] = useState<Patient | null>(null);
+
+  // Appointment Modal
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [preselectedDateForAppointment, setPreselectedDateForAppointment] = useState<string | null>(null);
+  const [preselectedTimeForAppointment, setPreselectedTimeForAppointment] = useState<string | null>(null);
+  const [preselectedPatientIdForAppointment, setPreselectedPatientIdForAppointment] = useState<string | null>(null);
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printPatient, setPrintPatient] = useState<Patient | null>(null);
@@ -172,14 +195,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Refresh data
   const refreshData = useCallback(async () => {
     try {
-      const [pts, vsts, stt, st] = await Promise.all([
+      const [pts, vsts, appts, stt, st] = await Promise.all([
         dbService.getAllPatients(),
         dbService.getAllVisits(),
+        dbService.getAllAppointments(),
         dbService.getSettings(),
         dbService.getDashboardStats(),
       ]);
       setPatients(pts);
       setVisits(vsts);
+      setAppointments(appts);
       setSettingsState(stt);
       setStats(st);
     } catch (e) {
@@ -189,15 +214,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Initial load
+  // Initial load & real-time subscriptions
   useEffect(() => {
+    let unsubPatients: () => void = () => {};
+    let unsubVisits: () => void = () => {};
+    let unsubAppts: () => void = () => {};
+
     const init = async () => {
       setIsLoading(true);
       await dbService.init();
       await refreshData();
       setIsLoading(false);
+
+      unsubPatients = dbService.subscribePatients((cloudPatients) => {
+        setPatients(cloudPatients);
+      });
+      unsubVisits = dbService.subscribeVisits((cloudVisits) => {
+        setVisits(cloudVisits);
+      });
+      unsubAppts = dbService.subscribeAppointments((cloudAppts) => {
+        setAppointments(cloudAppts);
+      });
     };
     init();
+
+    return () => {
+      unsubPatients();
+      unsubVisits();
+      unsubAppts();
+    };
   }, [refreshData]);
 
   // Navigation helpers
@@ -239,6 +284,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPreselectedPatientForVisit(null);
   }, []);
 
+  // Appointment Modal Helpers
+  const openAddAppointmentModal = useCallback((date?: string, time?: string, patientId?: string) => {
+    setEditingAppointment(null);
+    setPreselectedDateForAppointment(date || null);
+    setPreselectedTimeForAppointment(time || null);
+    setPreselectedPatientIdForAppointment(patientId || null);
+    setIsAppointmentModalOpen(true);
+  }, []);
+
+  const openEditAppointmentModal = useCallback((appt: Appointment) => {
+    setEditingAppointment(appt);
+    setPreselectedDateForAppointment(null);
+    setPreselectedTimeForAppointment(null);
+    setPreselectedPatientIdForAppointment(null);
+    setIsAppointmentModalOpen(true);
+  }, []);
+
+  const closeAppointmentModal = useCallback(() => {
+    setIsAppointmentModalOpen(false);
+    setEditingAppointment(null);
+    setPreselectedDateForAppointment(null);
+    setPreselectedTimeForAppointment(null);
+    setPreselectedPatientIdForAppointment(null);
+  }, []);
+
+  const deleteAppointment = useCallback(async (id: string) => {
+    try {
+      await dbService.deleteAppointment(id);
+      await refreshData();
+      showToast('success', 'Jadwal pasien berhasil dihapus.', 'Jadwal Dihapus');
+    } catch {
+      showToast('error', 'Gagal menghapus jadwal pasien.', 'Error');
+    }
+  }, [refreshData, showToast]);
+
+  const updateAppointmentStatus = useCallback(async (id: string, status: AppointmentStatus) => {
+    try {
+      await dbService.updateAppointmentStatus(id, status);
+      await refreshData();
+      showToast('success', `Status jadwal diubah menjadi ${status}.`, 'Status Diperbarui');
+    } catch {
+      showToast('error', 'Gagal memperbarui status jadwal.', 'Error');
+    }
+  }, [refreshData, showToast]);
+
   const openPrintModal = useCallback((patient: Patient) => {
     setPrintPatient(patient);
     setIsPrintModalOpen(true);
@@ -259,6 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         viewPatientProfile,
         patients,
         visits,
+        appointments,
         settings,
         stats,
         isLoading,
@@ -279,6 +370,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openAddVisitModal,
         openEditVisitModal,
         closeVisitModal,
+        isAppointmentModalOpen,
+        editingAppointment,
+        preselectedDateForAppointment,
+        preselectedTimeForAppointment,
+        preselectedPatientIdForAppointment,
+        openAddAppointmentModal,
+        openEditAppointmentModal,
+        closeAppointmentModal,
+        deleteAppointment,
+        updateAppointmentStatus,
         isPrintModalOpen,
         printPatient,
         openPrintModal,

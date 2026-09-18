@@ -16,6 +16,7 @@ import {
   MapPin,
   CheckCircle2,
   Calendar,
+  CalendarDays,
   FileText,
   Wallet,
   Receipt,
@@ -29,6 +30,8 @@ export const DashboardView: React.FC = () => {
     stats,
     patients,
     visits,
+    appointments,
+    openAddAppointmentModal,
     viewPatientProfile,
     openAddPatientModal,
     openAddVisitModal,
@@ -42,6 +45,13 @@ export const DashboardView: React.FC = () => {
   const todayVisits = useMemo(() => {
     return visits.filter((v) => v.date === today);
   }, [visits, today]);
+
+  // Today's scheduled appointments
+  const todayAppointments = useMemo(() => {
+    return (appointments || [])
+      .filter((a) => a.date === today)
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [appointments, today]);
 
   // Recent patients (latest 5)
   const recentPatients = useMemo(() => {
@@ -84,8 +94,8 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-200">
-      {/* QUICK ACTIONS BANNER - PROMINENT TAMBAH PASIEN & CATAT KUNJUNGAN */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* QUICK ACTIONS BANNER - PROMINENT TAMBAH PASIEN, JADWAL & CATAT KUNJUNGAN */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Tambah Pasien Card */}
         <div
           id="dashboard-card-add-patient"
@@ -96,27 +106,61 @@ export const DashboardView: React.FC = () => {
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500 pointer-events-none" />
           
           <div className="relative z-10 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3.5 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-blue-700 transition-all duration-300">
-                <UserPlus2 className="w-6 h-6" />
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-blue-700 transition-all duration-300">
+                <UserPlus2 className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
-                    + Tambah Pasien Baru
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                    + Pasien Baru
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30 backdrop-blur-xs">
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-white/20 text-white border border-white/30">
                     RME
                   </span>
                 </div>
-                <p className="text-xs text-blue-100/90 mt-0.5 font-medium leading-snug">
-                  Daftarkan pasien baru, data identitas, kontak & riwayat medis awal.
+                <p className="text-[11px] text-blue-100/90 mt-0.5 font-medium leading-snug line-clamp-2">
+                  Daftarkan pasien, data kontak & riwayat medis.
                 </p>
               </div>
             </div>
 
-            <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-blue-700 text-white transition-all shadow-xs shrink-0">
-              <ArrowUpRight className="w-5 h-5" />
+            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-blue-700 text-white transition-all shadow-xs shrink-0">
+              <ArrowUpRight className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Jadwal & Kalender Card */}
+        <div
+          id="dashboard-card-schedule"
+          onClick={() => setActiveView('schedule')}
+          className="group relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-700 to-slate-900 dark:from-indigo-700 dark:via-purple-800 dark:to-[#0B132B] p-5 rounded-2xl shadow-md hover:shadow-xl text-white cursor-pointer transition-all duration-300 transform active:scale-[0.98] border border-indigo-500/30"
+        >
+          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500 pointer-events-none" />
+
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-purple-700 transition-all duration-300">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                    Jadwal & Kalender
+                  </h3>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-white/20 text-white border border-white/30">
+                    06:00 - 21:00
+                  </span>
+                </div>
+                <p className="text-[11px] text-purple-100/90 mt-0.5 font-medium leading-snug line-clamp-2">
+                  Kalender jadwal pasien terdaftar per jam.
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-purple-700 text-white transition-all shadow-xs shrink-0">
+              <ArrowUpRight className="w-4 h-4" />
             </div>
           </div>
         </div>
@@ -131,27 +175,27 @@ export const DashboardView: React.FC = () => {
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500 pointer-events-none" />
 
           <div className="relative z-10 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3.5 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-emerald-700 transition-all duration-300">
-                <PlusCircle className="w-6 h-6" />
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md text-white border border-white/20 shadow-inner group-hover:bg-white group-hover:text-emerald-700 transition-all duration-300">
+                <PlusCircle className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
-                    + Catat Kunjungan Terapi
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                    + Catat Terapi
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30 backdrop-blur-xs">
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-white/20 text-white border border-white/30">
                     SOAP
                   </span>
                 </div>
-                <p className="text-xs text-emerald-100/90 mt-0.5 font-medium leading-snug">
-                  Input sesi SOAP, intervensi modalitas fisioterapi & pembayaran.
+                <p className="text-[11px] text-emerald-100/90 mt-0.5 font-medium leading-snug line-clamp-2">
+                  Input sesi SOAP, intervensi modalitas & tarif.
                 </p>
               </div>
             </div>
 
-            <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-emerald-700 text-white transition-all shadow-xs shrink-0">
-              <ArrowUpRight className="w-5 h-5" />
+            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-xl bg-white/15 group-hover:bg-white group-hover:text-emerald-700 text-white transition-all shadow-xs shrink-0">
+              <ArrowUpRight className="w-4 h-4" />
             </div>
           </div>
         </div>
@@ -267,6 +311,109 @@ export const DashboardView: React.FC = () => {
             );
           })}
         </div>
+      </div>
+
+      {/* JADWAL TERAPI HARI INI (06:00 - 21:00) */}
+      <div className="bg-white dark:bg-[#0B132B]/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                Jadwal Terapi Pasien Hari Ini
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {formatDateIndonesian(today)} · Jam operasional 06:00 - 21:00 ({todayAppointments.length} sesi)
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveView('schedule')}
+            className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 text-xs font-bold transition-all flex items-center gap-1"
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            Buka Kalender Lengkap
+          </button>
+        </div>
+
+        {todayAppointments.length === 0 ? (
+          <div className="py-8 text-center">
+            <Calendar className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Belum ada pasien yang dijadwalkan untuk hari ini
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Klik tombol di bawah untuk memilih nama pasien dan jam yang tersedia (06:00 - 21:00).
+            </p>
+            <button
+              type="button"
+              onClick={() => openAddAppointmentModal(today, '08:00')}
+              className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1.5"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              + Jadwalkan Pasien Hari Ini
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4">
+            {todayAppointments.map((appt) => (
+              <div
+                key={appt.id}
+                className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-blue-400 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
+                      {appt.time} {appt.endTime ? `- ${appt.endTime}` : ''}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        appt.location === 'Home Care'
+                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                      }`}
+                    >
+                      {appt.location}
+                    </span>
+                  </div>
+
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => viewPatientProfile(appt.patientId)}
+                      className="font-bold text-sm text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left block truncate"
+                    >
+                      {appt.patientName}
+                    </button>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
+                      {appt.complaintOrService || 'Fisioterapi'} · Ftr. {appt.therapist}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between text-xs">
+                  <span className="text-[10px] font-bold text-slate-500">
+                    Status: <span className="text-slate-900 dark:text-white">{appt.status}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const foundPt = patients.find((p) => p.id === appt.patientId);
+                      openAddVisitModal(foundPt || null);
+                    }}
+                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Input SOAP
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* BOTTOM SECTION: TABLE + RIGHT INFO COLUMN */}

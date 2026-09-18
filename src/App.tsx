@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
+import { ScheduleCalendarView } from './components/ScheduleCalendarView';
 import { PatientListView } from './components/PatientListView';
 import { PatientProfileView } from './components/PatientProfileView';
 import { TherapyHistoryView } from './components/TherapyHistoryView';
@@ -10,6 +11,7 @@ import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { AddEditPatientModal } from './components/AddEditPatientModal';
 import { AddEditVisitModal } from './components/AddEditVisitModal';
+import { AddEditAppointmentModal } from './components/AddEditAppointmentModal';
 import { PrintMedicalRecordModal } from './components/PrintMedicalRecordModal';
 import { ToastContainer } from './components/ToastContainer';
 
@@ -30,6 +32,7 @@ const MainLayout: React.FC = () => {
         {/* Scrollable View Container */}
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl w-full mx-auto">
           {activeView === 'dashboard' && <DashboardView />}
+          {activeView === 'schedule' && <ScheduleCalendarView />}
           {activeView === 'patients' && <PatientListView />}
           {activeView === 'patient-profile' && <PatientProfileView />}
           {activeView === 'therapy-history' && <TherapyHistoryView />}
@@ -41,6 +44,7 @@ const MainLayout: React.FC = () => {
       {/* Global Modals & Dialogs */}
       <AddEditPatientModal />
       <AddEditVisitModal />
+      <AddEditAppointmentModal />
       <PrintMedicalRecordModal />
       <ToastContainer />
     </div>

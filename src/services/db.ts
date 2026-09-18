@@ -1,4 +1,4 @@
-import { Patient, TherapyVisit, AppSettings, DashboardStats } from '../types';
+import { Patient, TherapyVisit, AppSettings, DashboardStats, Appointment, AppointmentStatus } from '../types';
 import { getTodayDateString } from '../utils/formatters';
 import {
   collection,
@@ -35,7 +35,7 @@ function cleanForFirestore<T>(obj: T): T {
 }
 
 const DB_NAME = 'BFisioAppDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const DEFAULT_INTERVENTIONS = [
   'IR',
@@ -108,6 +108,12 @@ class DatabaseService {
 
         if (!localDb.objectStoreNames.contains('settings')) {
           localDb.createObjectStore('settings', { keyPath: 'id' });
+        }
+
+        if (!localDb.objectStoreNames.contains('appointments')) {
+          const apptStore = localDb.createObjectStore('appointments', { keyPath: 'id' });
+          apptStore.createIndex('date', 'date', { unique: false });
+          apptStore.createIndex('patientId', 'patientId', { unique: false });
         }
       };
 
@@ -286,6 +292,28 @@ class DatabaseService {
         return unsub;
       } catch (err) {
         console.warn('Error creating Firestore visits subscription:', err);
+      }
+    }
+    return () => {};
+  }
+
+  // Real-time listener for appointments (Jadwal Pasien)
+  subscribeAppointments(callback: (appointments: Appointment[]) => void): () => void {
+    if (isFirebaseReady && db) {
+      try {
+        const unsub = onSnapshot(collection(db, 'appointments'), (snapshot) => {
+          const list: Appointment[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as Appointment);
+          });
+          list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          callback(list);
+        }, (err) => {
+          console.warn('Firestore subscribeAppointments snapshot error:', err);
+        });
+        return unsub;
+      } catch (err) {
+        console.warn('Error creating Firestore appointments subscription:', err);
       }
     }
     return () => {};
@@ -702,6 +730,142 @@ class DatabaseService {
     await this.savePatient(patient);
   }
 
+  // APPOINTMENTS (JADWAL PASIEN)
+  async getAllAppointments(): Promise<Appointment[]> {
+    if (isFirebaseReady && db) {
+      try {
+        const snap = await getDocs(collection(db, 'appointments'));
+        const list: Appointment[] = [];
+        snap.forEach((docSnap) => {
+          list.push(docSnap.data() as Appointment);
+        });
+        list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+        return list;
+      } catch (err) {
+        console.warn('Firestore getAllAppointments error, reading local:', err);
+      }
+    }
+
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('appointments', 'readonly');
+      const store = tx.objectStore('appointments');
+      const req = store.getAll();
+      return new Promise((resolve) => {
+        req.onsuccess = () => {
+          const res = (req.result as Appointment[]) || [];
+          res.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          resolve(res);
+        };
+        req.onerror = () => resolve([]);
+      });
+    } catch {
+      const raw = localStorage.getItem('bfisio_appointments');
+      if (raw) {
+        try {
+          const list = JSON.parse(raw) as Appointment[];
+          list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          return list;
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+  }
+
+  async getAppointmentsByDate(date: string): Promise<Appointment[]> {
+    const all = await this.getAllAppointments();
+    return all.filter((a) => a.date === date);
+  }
+
+  async saveAppointment(appt: Partial<Appointment> & { patientId: string; patientName: string; mrn: string; date: string; time: string }): Promise<Appointment> {
+    const finalAppt: Appointment = {
+      id: appt.id || `appt-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      patientId: appt.patientId,
+      patientName: appt.patientName,
+      mrn: appt.mrn,
+      patientPhone: appt.patientPhone || '',
+      date: appt.date,
+      time: appt.time,
+      endTime: appt.endTime || '',
+      durationMinutes: appt.durationMinutes || 60,
+      location: appt.location || 'Klinik',
+      therapist: appt.therapist || 'Bintang',
+      status: appt.status || 'Dijadwalkan',
+      complaintOrService: appt.complaintOrService || '',
+      notes: appt.notes || '',
+      createdAt: appt.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1. Write to Firebase Firestore
+    if (isFirebaseReady && db) {
+      try {
+        await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
+      } catch (err) {
+        console.error('Firestore saveAppointment error:', err);
+      }
+    }
+
+    // 2. Write to local IndexedDB
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('appointments', 'readwrite');
+      const store = tx.objectStore('appointments');
+      store.put(finalAppt);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      const list = await this.getAllAppointments();
+      const idx = list.findIndex(a => a.id === finalAppt.id);
+      if (idx >= 0) {
+        list[idx] = finalAppt;
+      } else {
+        list.push(finalAppt);
+      }
+      localStorage.setItem('bfisio_appointments', JSON.stringify(list));
+    }
+
+    return finalAppt;
+  }
+
+  async deleteAppointment(id: string): Promise<void> {
+    // 1. Delete from Firestore
+    if (isFirebaseReady && db) {
+      try {
+        await deleteDoc(doc(db, 'appointments', id));
+      } catch (err) {
+        console.error('Firestore deleteAppointment error:', err);
+      }
+    }
+
+    // 2. Delete from local IndexedDB
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('appointments', 'readwrite');
+      const store = tx.objectStore('appointments');
+      store.delete(id);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      let list = await this.getAllAppointments();
+      list = list.filter(a => a.id !== id);
+      localStorage.setItem('bfisio_appointments', JSON.stringify(list));
+    }
+  }
+
+  async updateAppointmentStatus(id: string, status: AppointmentStatus): Promise<void> {
+    const list = await this.getAllAppointments();
+    const appt = list.find(a => a.id === id);
+    if (!appt) return;
+    await this.saveAppointment({ ...appt, status });
+  }
+
   // SETTINGS
   async getSettings(): Promise<AppSettings> {
     if (isFirebaseReady && db) {
@@ -831,6 +995,7 @@ class DatabaseService {
   async exportBackup(): Promise<string> {
     const patients = await this.getAllPatients();
     const visits = await this.getAllVisits();
+    const appointments = await this.getAllAppointments();
     const settings = await this.getSettings();
 
     const backupData = {
@@ -842,6 +1007,7 @@ class DatabaseService {
       data: {
         patients,
         visits,
+        appointments,
         settings,
       },
     };
@@ -849,7 +1015,7 @@ class DatabaseService {
     return JSON.stringify(backupData, null, 2);
   }
 
-  async restoreBackup(jsonString: string): Promise<{ success: boolean; patientsCount: number; visitsCount: number; message?: string }> {
+  async restoreBackup(jsonString: string): Promise<{ success: boolean; patientsCount: number; visitsCount: number; appointmentsCount?: number; message?: string }> {
     try {
       const parsed = JSON.parse(jsonString);
       if (!parsed.data || !Array.isArray(parsed.data.patients) || !Array.isArray(parsed.data.visits)) {
@@ -858,6 +1024,7 @@ class DatabaseService {
 
       const patients: Patient[] = parsed.data.patients;
       const visits: TherapyVisit[] = parsed.data.visits;
+      const appointments: Appointment[] = Array.isArray(parsed.data.appointments) ? parsed.data.appointments : [];
       const settings: AppSettings = parsed.data.settings || DEFAULT_SETTINGS;
 
       // Restore to Firebase Firestore
@@ -870,6 +1037,9 @@ class DatabaseService {
           for (const v of visits) {
             batch.set(doc(db, 'visits', v.id), cleanForFirestore(v));
           }
+          for (const a of appointments) {
+            batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
+          }
           batch.set(doc(db, 'settings', 'app_settings'), cleanForFirestore({ id: 'app_settings', ...settings }));
           await batch.commit();
         } catch (err) {
@@ -880,15 +1050,19 @@ class DatabaseService {
       // Clear & write local
       try {
         const localDb = await this.getDB();
-        const tx = localDb.transaction(['patients', 'visits', 'settings'], 'readwrite');
+        const tx = localDb.transaction(['patients', 'visits', 'appointments', 'settings'], 'readwrite');
         tx.objectStore('patients').clear();
         tx.objectStore('visits').clear();
+        tx.objectStore('appointments').clear();
 
         for (const p of patients) {
           tx.objectStore('patients').put(p);
         }
         for (const v of visits) {
           tx.objectStore('visits').put(v);
+        }
+        for (const a of appointments) {
+          tx.objectStore('appointments').put(a);
         }
         tx.objectStore('settings').put({ id: 'app_settings', ...settings });
 
@@ -899,6 +1073,7 @@ class DatabaseService {
       } catch {
         localStorage.setItem('bfisio_patients', JSON.stringify(patients));
         localStorage.setItem('bfisio_visits', JSON.stringify(visits));
+        localStorage.setItem('bfisio_appointments', JSON.stringify(appointments));
         localStorage.setItem('bfisio_settings', JSON.stringify(settings));
       }
 
@@ -906,6 +1081,7 @@ class DatabaseService {
         success: true,
         patientsCount: patients.length,
         visitsCount: visits.length,
+        appointmentsCount: appointments.length,
       };
     } catch (e) {
       return { success: false, patientsCount: 0, visitsCount: 0, message: (e as Error).message };
@@ -919,6 +1095,7 @@ class DatabaseService {
     }
     const patients = await this.getAllPatients();
     const visits = await this.getAllVisits();
+    const appointments = await this.getAllAppointments();
     const settings = await this.getSettings();
 
     const batch = writeBatch(db);
@@ -927,6 +1104,9 @@ class DatabaseService {
     }
     for (const v of visits) {
       batch.set(doc(db, 'visits', v.id), cleanForFirestore(v));
+    }
+    for (const a of appointments) {
+      batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
     }
     batch.set(doc(db, 'settings', 'app_settings'), cleanForFirestore({ id: 'app_settings', ...settings }));
     await batch.commit();
@@ -938,27 +1118,30 @@ class DatabaseService {
     };
   }
 
-  // Clear all patient and visit data (0 patients)
+  // Clear all patient, visit, and appointment data (0 patients)
   async clearAllPatientData(): Promise<void> {
     if (isFirebaseReady && db) {
       try {
         const pSnap = await getDocs(collection(db, 'patients'));
         const vSnap = await getDocs(collection(db, 'visits'));
+        const aSnap = await getDocs(collection(db, 'appointments'));
 
         const batch = writeBatch(db);
         pSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
         vSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+        aSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
         await batch.commit();
       } catch (err) {
-        console.error('Error clearing Firestore patients/visits:', err);
+        console.error('Error clearing Firestore patients/visits/appointments:', err);
       }
     }
 
     try {
       const localDb = await this.getDB();
-      const tx = localDb.transaction(['patients', 'visits'], 'readwrite');
+      const tx = localDb.transaction(['patients', 'visits', 'appointments'], 'readwrite');
       tx.objectStore('patients').clear();
       tx.objectStore('visits').clear();
+      tx.objectStore('appointments').clear();
     } catch (err) {
       console.warn('IndexedDB clear error:', err);
     }
@@ -966,6 +1149,7 @@ class DatabaseService {
     try {
       localStorage.setItem('bfisio_patients', JSON.stringify([]));
       localStorage.setItem('bfisio_visits', JSON.stringify([]));
+      localStorage.setItem('bfisio_appointments', JSON.stringify([]));
     } catch (err) {
       console.warn('LocalStorage clear error:', err);
     }
