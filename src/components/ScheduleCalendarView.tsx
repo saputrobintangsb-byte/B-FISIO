@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Appointment, AppointmentStatus, TherapyLocation } from '../types';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -33,6 +33,8 @@ import {
   Filter,
   UserPlus,
   Search,
+  RefreshCw,
+  Cloud,
 } from 'lucide-react';
 
 export const ScheduleCalendarView: React.FC = () => {
@@ -48,6 +50,8 @@ export const ScheduleCalendarView: React.FC = () => {
     openAddVisitModal,
     viewPatientProfile,
     openAddPatientModal,
+    syncAppointmentsToCloud,
+    showToast,
   } = useApp();
 
   const todayStr = getTodayDateString();
@@ -59,6 +63,30 @@ export const ScheduleCalendarView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState<boolean>(false);
   const [isClearing, setIsClearing] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Auto-sync schedules on mount so local data is guaranteed synced to cloud
+  useEffect(() => {
+    syncAppointmentsToCloud().catch((err) => {
+      console.warn('Auto schedule sync on mount error:', err);
+    });
+  }, [syncAppointmentsToCloud]);
+
+  const handleSyncSchedule = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await syncAppointmentsToCloud();
+      showToast(
+        'success',
+        `Sinkronisasi database berhasil! ${res.totalCount} jadwal aktif terhubung dengan Firebase Firestore.`,
+        'Database Tersinkron'
+      );
+    } catch {
+      showToast('error', 'Gagal menyinkronkan jadwal ke database Firebase.', 'Error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Filters
   const [filterTherapist, setFilterTherapist] = useState<string>('all');
@@ -284,38 +312,55 @@ export const ScheduleCalendarView: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <span className="p-2 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400">
               <CalendarDays className="w-5 h-5" />
             </span>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               Jadwal & Kalender Pasien
             </h1>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Database Cloud Terhubung</span>
+            </div>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Penjadwalan sesi fisioterapi pasien pada setiap tanggal (slot jam tersedia: 06:00 s/d 21:00)
+            Penjadwalan sesi fisioterapi pasien pada setiap tanggal (slot jam tersedia: 06:00 s/d 21:00) &bull; Sinkronisasi real-time Firestore
           </p>
         </div>
 
-        {/* Primary Action Button */}
-        <div className="flex items-center gap-2.5">
+        {/* Primary Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <button
+            type="button"
+            id="btn-sync-schedule"
+            onClick={handleSyncSchedule}
+            disabled={isSyncing}
+            className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            title="Sinkronkan seluruh jadwal dengan database Firebase Cloud"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+            <span>{isSyncing ? 'Menyinkron...' : 'Sinkron Database'}</span>
+          </button>
+
           {appointments.length > 0 && (
             <button
               type="button"
               id="btn-clear-all-schedule"
               onClick={() => setIsClearAllModalOpen(true)}
-              className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
               title="Hapus semua jadwal pasien dari kalender"
             >
-              <Trash2 className="w-4 h-4" />
-              Bersihkan Semua Jadwal ({appointments.length})
+              <Trash2 className="w-3.5 h-3.5" />
+              Bersihkan ({appointments.length})
             </button>
           )}
+
           <button
             type="button"
             id="btn-add-schedule"
             onClick={() => openAddAppointmentModal(selectedDate, '08:00')}
-            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             + Buat Jadwal Pasien

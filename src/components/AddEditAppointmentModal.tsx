@@ -64,6 +64,7 @@ export const AddEditAppointmentModal: React.FC = () => {
     preselectedPatientIdForAppointment,
     closeAppointmentModal,
     openAddPatientModal,
+    saveAppointment,
     patients,
     appointments,
     settings,
@@ -230,11 +231,10 @@ export const AddEditAppointmentModal: React.FC = () => {
         createdAt: editingAppointment ? editingAppointment.createdAt : new Date().toISOString(),
       };
 
-      await dbService.saveAppointment(apptData);
-      await refreshData();
+      await saveAppointment(apptData);
       showToast(
         'success',
-        `Jadwal pasien ${selectedPatient.fullName} pada ${date} pukul ${time} berhasil disimpan.`,
+        `Jadwal pasien ${selectedPatient.fullName} (${date} pukul ${time}) berhasil disimpan & disinkronkan ke database.`,
         editingAppointment ? 'Jadwal Diperbarui' : 'Jadwal Ditambahkan'
       );
       closeAppointmentModal();

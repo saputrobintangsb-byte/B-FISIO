@@ -35,7 +35,7 @@ function cleanForFirestore<T>(obj: T): T {
 }
 
 const DB_NAME = 'BFisioAppDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const DEFAULT_INTERVENTIONS = [
   'IR',
@@ -894,22 +894,41 @@ class DatabaseService {
     if (isFirebaseReady && db) {
       try {
         const snap = await getDocs(collection(db, 'appointments'));
-        const list: Appointment[] = [];
+        const cloudList: Appointment[] = [];
         snap.forEach((docSnap) => {
-          list.push(docSnap.data() as Appointment);
+          cloudList.push(docSnap.data() as Appointment);
         });
-        list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
-        if (list.length > 0) {
-          await this.cacheLocalAppointments(list);
-          return list;
-        } else {
-          const localList = await this.getLocalAppointments();
-          if (localList.length > 0) {
-            this.syncLocalToCloud().catch((err) => console.warn('Background sync appointments error:', err));
-            return localList;
+
+        // Smart reconciliation: Check if there are local appointments not yet in Firestore
+        const localList = await this.getLocalAppointments();
+        const cloudIds = new Set(cloudList.map((a) => a.id));
+        const unsynced = localList.filter((a) => !cloudIds.has(a.id));
+
+        if (unsynced.length > 0) {
+          console.log(`[Firestore Sync] Auto-uploading ${unsynced.length} unsynced local appointments to Firestore`);
+          try {
+            const batch = writeBatch(db);
+            for (const a of unsynced) {
+              batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
+              cloudList.push(a);
+            }
+            await batch.commit();
+          } catch (batchErr) {
+            console.warn('Batch sync appointments failed, trying individual setDoc:', batchErr);
+            for (const a of unsynced) {
+              try {
+                await setDoc(doc(db, 'appointments', a.id), cleanForFirestore(a));
+                cloudList.push(a);
+              } catch (singleErr) {
+                console.warn('Single appointment setDoc error:', a.id, singleErr);
+              }
+            }
           }
-          return [];
         }
+
+        cloudList.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+        await this.cacheLocalAppointments(cloudList);
+        return cloudList;
       } catch (err) {
         console.warn('Firestore getAllAppointments error, reading local:', err);
       }
@@ -921,6 +940,34 @@ class DatabaseService {
   async getAppointmentsByDate(date: string): Promise<Appointment[]> {
     const all = await this.getAllAppointments();
     return all.filter((a) => a.date === date);
+  }
+
+  // Dedicated sync method for schedules
+  async syncAppointmentsToCloud(): Promise<{ success: boolean; syncedCount: number; totalCount: number }> {
+    if (!isFirebaseReady || !db) {
+      const local = await this.getLocalAppointments();
+      return { success: false, syncedCount: 0, totalCount: local.length };
+    }
+
+    const local = await this.getLocalAppointments();
+    const snap = await getDocs(collection(db, 'appointments'));
+    const cloudIds = new Set(snap.docs.map((d) => d.id));
+    const unsynced = local.filter((a) => !cloudIds.has(a.id));
+
+    if (unsynced.length > 0) {
+      const batch = writeBatch(db);
+      for (const a of unsynced) {
+        batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
+      }
+      await batch.commit();
+    }
+
+    const merged = await this.getAllAppointments();
+    return {
+      success: true,
+      syncedCount: unsynced.length,
+      totalCount: merged.length,
+    };
   }
 
   async saveAppointment(appt: Partial<Appointment> & { patientId: string; patientName: string; mrn: string; date: string; time: string }): Promise<Appointment> {
@@ -943,14 +990,14 @@ class DatabaseService {
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Write to Firebase Firestore
+    // 1. Write to Firebase Firestore immediately
     if (isFirebaseReady && db) {
       try {
         await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
       } catch (err) {
         console.warn('Firestore saveAppointment warning (will retry once):', err);
         try {
-          await new Promise((r) => setTimeout(r, 600));
+          await new Promise((r) => setTimeout(r, 400));
           await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
         } catch (retryErr) {
           console.warn('Firestore saveAppointment secondary sync pending, local saved:', retryErr);
@@ -968,15 +1015,23 @@ class DatabaseService {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
-    } catch {
-      const list = await this.getAllAppointments();
-      const idx = list.findIndex(a => a.id === finalAppt.id);
+    } catch (idbErr) {
+      console.warn('IndexedDB saveAppointment warning:', idbErr);
+    }
+
+    // 3. Always maintain localStorage backup for instant read/offline
+    try {
+      const raw = localStorage.getItem('bfisio_appointments');
+      const list: Appointment[] = raw ? JSON.parse(raw) : [];
+      const idx = list.findIndex((a) => a.id === finalAppt.id);
       if (idx >= 0) {
         list[idx] = finalAppt;
       } else {
         list.push(finalAppt);
       }
       localStorage.setItem('bfisio_appointments', JSON.stringify(list));
+    } catch (lsErr) {
+      console.warn('LocalStorage saveAppointment warning:', lsErr);
     }
 
     return finalAppt;
@@ -990,7 +1045,7 @@ class DatabaseService {
       } catch (err) {
         console.warn('Firestore deleteAppointment warning (will retry once):', err);
         try {
-          await new Promise((r) => setTimeout(r, 600));
+          await new Promise((r) => setTimeout(r, 400));
           await deleteDoc(doc(db, 'appointments', id));
         } catch (retryErr) {
           console.warn('Firestore deleteAppointment secondary sync pending, local deleted:', retryErr);
@@ -1008,16 +1063,26 @@ class DatabaseService {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
-    } catch {
-      let list = await this.getAllAppointments();
-      list = list.filter(a => a.id !== id);
-      localStorage.setItem('bfisio_appointments', JSON.stringify(list));
+    } catch (idbErr) {
+      console.warn('IndexedDB deleteAppointment warning:', idbErr);
+    }
+
+    // 3. Delete from localStorage
+    try {
+      const raw = localStorage.getItem('bfisio_appointments');
+      if (raw) {
+        const list: Appointment[] = JSON.parse(raw);
+        const filtered = list.filter((a) => a.id !== id);
+        localStorage.setItem('bfisio_appointments', JSON.stringify(filtered));
+      }
+    } catch (lsErr) {
+      console.warn('LocalStorage deleteAppointment warning:', lsErr);
     }
   }
 
   async updateAppointmentStatus(id: string, status: AppointmentStatus): Promise<void> {
     const list = await this.getAllAppointments();
-    const appt = list.find(a => a.id === id);
+    const appt = list.find((a) => a.id === id);
     if (!appt) return;
     await this.saveAppointment({ ...appt, status });
   }

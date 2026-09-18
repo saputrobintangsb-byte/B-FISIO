@@ -61,9 +61,11 @@ interface AppContextType {
   openAddAppointmentModal: (date?: string, time?: string, patientId?: string) => void;
   openEditAppointmentModal: (appt: Appointment) => void;
   closeAppointmentModal: () => void;
+  saveAppointment: (appt: Partial<Appointment> & { patientId: string; patientName: string; mrn: string; date: string; time: string }) => Promise<Appointment>;
   deleteAppointment: (id: string) => Promise<void>;
   updateAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
   clearAllAppointments: () => Promise<void>;
+  syncAppointmentsToCloud: () => Promise<{ success: boolean; syncedCount: number; totalCount: number }>;
 
   isPrintModalOpen: boolean;
   printPatient: Patient | null;
@@ -328,6 +330,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPreselectedPatientIdForAppointment(null);
   }, []);
 
+  const saveAppointment = useCallback(
+    async (appt: Partial<Appointment> & { patientId: string; patientName: string; mrn: string; date: string; time: string }) => {
+      const saved = await dbService.saveAppointment(appt);
+      setAppointments((prev) => {
+        const idx = prev.findIndex((a) => a.id === saved.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = saved;
+          return copy.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+        }
+        return [saved, ...prev].sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+      });
+      await refreshData();
+      return saved;
+    },
+    [refreshData]
+  );
+
   const deleteAppointment = useCallback(async (id: string) => {
     try {
       await dbService.deleteAppointment(id);
@@ -375,6 +395,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const syncLocalToCloud = useCallback(async () => {
     const res = await dbService.syncLocalToCloud();
+    await refreshData();
+    return res;
+  }, [refreshData]);
+
+  const syncAppointmentsToCloud = useCallback(async () => {
+    const res = await dbService.syncAppointmentsToCloud();
     await refreshData();
     return res;
   }, [refreshData]);
@@ -432,9 +458,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openAddAppointmentModal,
         openEditAppointmentModal,
         closeAppointmentModal,
+        saveAppointment,
         deleteAppointment,
         updateAppointmentStatus,
         clearAllAppointments,
+        syncAppointmentsToCloud,
         isPrintModalOpen,
         printPatient,
         openPrintModal,
