@@ -20,5 +20,10 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read, write: if true;
     }
+
+    // Global fallback for all clinic documents and subcollections
+    match /{document=**} {
+      allow read, write: if true;
+    }
   }
 }

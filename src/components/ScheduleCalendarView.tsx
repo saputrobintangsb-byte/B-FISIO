@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Appointment, AppointmentStatus, TherapyLocation } from '../types';
+import { ConfirmationModal } from './ConfirmationModal';
 import {
   formatDayDate,
   formatDateIndonesian,
@@ -43,6 +44,7 @@ export const ScheduleCalendarView: React.FC = () => {
     openEditAppointmentModal,
     deleteAppointment,
     updateAppointmentStatus,
+    clearAllAppointments,
     openAddVisitModal,
     viewPatientProfile,
     openAddPatientModal,
@@ -55,6 +57,8 @@ export const ScheduleCalendarView: React.FC = () => {
   const [currentYear, setCurrentYear] = useState<number>(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(today.getMonth()); // 0 - 11
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState<boolean>(false);
+  const [isClearing, setIsClearing] = useState<boolean>(false);
 
   // Filters
   const [filterTherapist, setFilterTherapist] = useState<string>('all');
@@ -295,6 +299,18 @@ export const ScheduleCalendarView: React.FC = () => {
 
         {/* Primary Action Button */}
         <div className="flex items-center gap-2.5">
+          {appointments.length > 0 && (
+            <button
+              type="button"
+              id="btn-clear-all-schedule"
+              onClick={() => setIsClearAllModalOpen(true)}
+              className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Hapus semua jadwal pasien dari kalender"
+            >
+              <Trash2 className="w-4 h-4" />
+              Bersihkan Semua Jadwal ({appointments.length})
+            </button>
+          )}
           <button
             type="button"
             id="btn-add-schedule"
@@ -1034,6 +1050,26 @@ export const ScheduleCalendarView: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Confirmation Modal to Clear All Appointments */}
+      <ConfirmationModal
+        isOpen={isClearAllModalOpen}
+        title="Hapus Semua Jadwal Pasien di Kalender?"
+        message={`Apakah Anda yakin ingin menghapus seluruh ${appointments.length} jadwal pasien yang ada di kalender? Tindakan ini akan mengosongkan kalender kembali mulai dari awal tanpa ada pasien yang terjadwal. Data pasien dan riwayat kunjungan SOAP tetap aman.`}
+        confirmLabel={isClearing ? 'Menghapus...' : 'Hapus Semua Jadwal'}
+        cancelLabel="Batal"
+        isDanger={true}
+        onConfirm={async () => {
+          setIsClearing(true);
+          try {
+            await clearAllAppointments();
+            setIsClearAllModalOpen(false);
+          } finally {
+            setIsClearing(false);
+          }
+        }}
+        onCancel={() => setIsClearAllModalOpen(false)}
+      />
     </div>
   );
 };

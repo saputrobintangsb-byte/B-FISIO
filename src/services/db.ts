@@ -170,6 +170,16 @@ class DatabaseService {
           }
           await batch.commit();
         }
+
+        // Clean out all calendar appointments from Firestore so calendar is completely empty (0 scheduled patients)
+        const aSnap = await getDocs(collection(db, 'appointments'));
+        if (!aSnap.empty) {
+          const batch = writeBatch(db);
+          for (const d of aSnap.docs) {
+            batch.delete(d.ref);
+          }
+          await batch.commit();
+        }
       } catch (err) {
         console.warn('Firestore initial check/cleanup error:', err);
       }
@@ -177,10 +187,14 @@ class DatabaseService {
 
     try {
       const localDb = await this.getDB();
-      const tx = localDb.transaction(['patients', 'visits', 'settings'], 'readwrite');
+      const tx = localDb.transaction(['patients', 'visits', 'appointments', 'settings'], 'readwrite');
       const pStore = tx.objectStore('patients');
       const vStore = tx.objectStore('visits');
+      const aStore = tx.objectStore('appointments');
       const sStore = tx.objectStore('settings');
+
+      // Clear all appointments from IndexedDB to ensure empty calendar
+      aStore.clear();
 
       // Ensure settings exist in IndexedDB
       const sReq = sStore.get('app_settings');
@@ -238,6 +252,9 @@ class DatabaseService {
       if (!localStorage.getItem('bfisio_settings')) {
         localStorage.setItem('bfisio_settings', JSON.stringify(DEFAULT_SETTINGS));
       }
+
+      // Reset calendar appointments in LocalStorage to empty
+      localStorage.setItem('bfisio_appointments', JSON.stringify([]));
     } catch (e) {
       console.warn('LocalStorage cleanup error:', e);
     }
@@ -804,7 +821,13 @@ class DatabaseService {
       try {
         await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
       } catch (err) {
-        console.error('Firestore saveAppointment error:', err);
+        console.warn('Firestore saveAppointment warning (will retry once):', err);
+        try {
+          await new Promise((r) => setTimeout(r, 600));
+          await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
+        } catch (retryErr) {
+          console.warn('Firestore saveAppointment secondary sync pending, local saved:', retryErr);
+        }
       }
     }
 
@@ -838,7 +861,13 @@ class DatabaseService {
       try {
         await deleteDoc(doc(db, 'appointments', id));
       } catch (err) {
-        console.error('Firestore deleteAppointment error:', err);
+        console.warn('Firestore deleteAppointment warning (will retry once):', err);
+        try {
+          await new Promise((r) => setTimeout(r, 600));
+          await deleteDoc(doc(db, 'appointments', id));
+        } catch (retryErr) {
+          console.warn('Firestore deleteAppointment secondary sync pending, local deleted:', retryErr);
+        }
       }
     }
 
@@ -864,6 +893,43 @@ class DatabaseService {
     const appt = list.find(a => a.id === id);
     if (!appt) return;
     await this.saveAppointment({ ...appt, status });
+  }
+
+  // Clear all appointments from calendar (0 scheduled patients)
+  async clearAllAppointments(): Promise<void> {
+    // 1. Delete all appointments from Firestore
+    if (isFirebaseReady && db) {
+      try {
+        const aSnap = await getDocs(collection(db, 'appointments'));
+        if (!aSnap.empty) {
+          const batch = writeBatch(db);
+          aSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+          await batch.commit();
+        }
+      } catch (err) {
+        console.warn('Firestore clearAllAppointments error:', err);
+      }
+    }
+
+    // 2. Clear from IndexedDB
+    try {
+      const localDb = await this.getDB();
+      const tx = localDb.transaction('appointments', 'readwrite');
+      tx.objectStore('appointments').clear();
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB clear appointments error:', err);
+    }
+
+    // 3. Clear from LocalStorage fallback
+    try {
+      localStorage.setItem('bfisio_appointments', JSON.stringify([]));
+    } catch (err) {
+      console.warn('LocalStorage clear appointments error:', err);
+    }
   }
 
   // SETTINGS

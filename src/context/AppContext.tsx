@@ -63,6 +63,7 @@ interface AppContextType {
   closeAppointmentModal: () => void;
   deleteAppointment: (id: string) => Promise<void>;
   updateAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
+  clearAllAppointments: () => Promise<void>;
 
   isPrintModalOpen: boolean;
   printPatient: Patient | null;
@@ -329,6 +330,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [refreshData, showToast]);
 
+  const clearAllAppointments = useCallback(async () => {
+    try {
+      await dbService.clearAllAppointments();
+      await refreshData();
+      showToast('success', 'Semua jadwal pasien di kalender berhasil dihapus.', 'Kalender Bersih');
+    } catch {
+      showToast('error', 'Gagal membersihkan jadwal kalender.', 'Error');
+    }
+  }, [refreshData, showToast]);
+
   const openPrintModal = useCallback((patient: Patient) => {
     setPrintPatient(patient);
     setIsPrintModalOpen(true);
@@ -380,6 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeAppointmentModal,
         deleteAppointment,
         updateAppointmentStatus,
+        clearAllAppointments,
         isPrintModalOpen,
         printPatient,
         openPrintModal,
