@@ -131,8 +131,8 @@ export const ScheduleCalendarView: React.FC = () => {
       if (filterStatus !== 'all' && appt.status !== filterStatus) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchName = appt.patientName.toLowerCase().includes(q);
-        const matchMrn = appt.mrn.toLowerCase().includes(q);
+        const matchName = (appt.patientName || '').toLowerCase().includes(q);
+        const matchMrn = (appt.mrn || '').toLowerCase().includes(q);
         const matchService = (appt.complaintOrService || '').toLowerCase().includes(q);
         if (!matchName && !matchMrn && !matchService) return false;
       }
@@ -147,7 +147,7 @@ export const ScheduleCalendarView: React.FC = () => {
       const existing = map.get(appt.date) || [];
       existing.push(appt);
       // sort by time
-      existing.sort((a, b) => a.time.localeCompare(b.time));
+      existing.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       map.set(appt.date, existing);
     }
     return map;
@@ -156,7 +156,7 @@ export const ScheduleCalendarView: React.FC = () => {
   // Appointments for the currently selected date
   const appointmentsOnSelectedDate = useMemo(() => {
     const list = appointmentsByDate.get(selectedDate) || [];
-    return [...list].sort((a, b) => a.time.localeCompare(b.time));
+    return [...list].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }, [appointmentsByDate, selectedDate]);
 
   // Calendar grid calculations
@@ -236,6 +236,7 @@ export const ScheduleCalendarView: React.FC = () => {
     const todayAppts = appointments.filter((a) => a.date === todayStr);
     const selectedDateAppts = appointments.filter((a) => a.date === selectedDate);
     const totalMonth = appointments.filter((a) => {
+      if (!a.date || typeof a.date !== 'string') return false;
       const parts = a.date.split('-');
       return Number(parts[0]) === currentYear && Number(parts[1]) === currentMonth + 1;
     });
@@ -255,7 +256,7 @@ export const ScheduleCalendarView: React.FC = () => {
     if (!appt.patientPhone) return;
     const cleanPhone = appt.patientPhone.replace(/\D/g, '');
     let formattedPhone = cleanPhone;
-    if (formattedPhone.startsWith('0')) {
+    if (formattedPhone && formattedPhone.startsWith('0')) {
       formattedPhone = '62' + formattedPhone.slice(1);
     }
 
@@ -729,7 +730,7 @@ export const ScheduleCalendarView: React.FC = () => {
                 // Find appointments starting in this hour (e.g. 08:00 or 08:30)
                 const hourPrefix = hour.split(':')[0];
                 const matchingAppts = appointmentsOnSelectedDate.filter((a) => {
-                  const aHour = a.time.split(':')[0];
+                  const aHour = (a.time || '').split(':')[0];
                   return aHour === hourPrefix;
                 });
 

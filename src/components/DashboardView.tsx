@@ -50,7 +50,7 @@ export const DashboardView: React.FC = () => {
   const todayAppointments = useMemo(() => {
     return (appointments || [])
       .filter((a) => a.date === today)
-      .sort((a, b) => a.time.localeCompare(b.time));
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }, [appointments, today]);
 
   // Recent patients (latest 5)
@@ -74,9 +74,13 @@ export const DashboardView: React.FC = () => {
       let revenue = 0;
 
       for (const v of visits) {
-        if (v.date.startsWith(monthKey)) {
+        if (!v) continue;
+        const vDate = typeof v.date === 'string' ? v.date : '';
+        if (vDate && vDate.startsWith(monthKey)) {
           visitsCount++;
-          revenue += (v.payment.paidAmount || (v.payment.status === 'Lunas' ? v.payment.total : 0));
+          if (v.payment) {
+            revenue += (v.payment.paidAmount || (v.payment.status === 'Lunas' ? v.payment.total : 0));
+          }
         }
       }
 

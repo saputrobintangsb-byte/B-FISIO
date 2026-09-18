@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
   deleteDoc,
   writeBatch,
   query,
@@ -150,7 +151,7 @@ class DatabaseService {
         req.onsuccess = () => {
           const list = (req.result as Patient[]) || [];
           const filtered = list.filter((p) => !p.id?.startsWith('p-seed-'));
-          filtered.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+          filtered.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
           resolve(filtered);
         };
         req.onerror = () => resolve([]);
@@ -159,7 +160,7 @@ class DatabaseService {
       const raw = localStorage.getItem('bfisio_patients');
       const list: Patient[] = raw ? JSON.parse(raw) : [];
       const filtered = list.filter((p) => !p.id?.startsWith('p-seed-'));
-      filtered.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+      filtered.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
       return filtered;
     }
   }
@@ -190,7 +191,7 @@ class DatabaseService {
         req.onsuccess = () => {
           const list = (req.result as TherapyVisit[]) || [];
           const filtered = list.filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
-          filtered.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+          filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.visitNumber || 0) - (a.visitNumber || 0));
           resolve(filtered);
         };
         req.onerror = () => resolve([]);
@@ -199,7 +200,7 @@ class DatabaseService {
       const raw = localStorage.getItem('bfisio_visits');
       const list: TherapyVisit[] = raw ? JSON.parse(raw) : [];
       const filtered = list.filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
-      filtered.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+      filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.visitNumber || 0) - (a.visitNumber || 0));
       return filtered;
     }
   }
@@ -229,7 +230,7 @@ class DatabaseService {
         const req = store.getAll();
         req.onsuccess = () => {
           const list = (req.result as Appointment[]) || [];
-          list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
           resolve(list);
         };
         req.onerror = () => resolve([]);
@@ -237,7 +238,7 @@ class DatabaseService {
     } catch {
       const raw = localStorage.getItem('bfisio_appointments');
       const list: Appointment[] = raw ? JSON.parse(raw) : [];
-      list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
       return list;
     }
   }
@@ -271,7 +272,7 @@ class DatabaseService {
 
         // Clean out any legacy seed sample patients from Firestore
         const pSnap = await getDocs(collection(db, 'patients'));
-        const seedPatientDocs = pSnap.docs.filter((d) => d.id.startsWith('p-seed-'));
+        const seedPatientDocs = pSnap.docs.filter((d) => d.id?.startsWith('p-seed-'));
         if (seedPatientDocs.length > 0) {
           const batch = writeBatch(db);
           for (const d of seedPatientDocs) {
@@ -282,7 +283,7 @@ class DatabaseService {
 
         // Clean out any legacy seed sample visits from Firestore
         const vSnap = await getDocs(collection(db, 'visits'));
-        const seedVisitDocs = vSnap.docs.filter((d) => d.id.startsWith('v-seed-') || d.data().patientId?.startsWith('p-seed-'));
+        const seedVisitDocs = vSnap.docs.filter((d) => d.id?.startsWith('v-seed-') || d.data()?.patientId?.startsWith('p-seed-'));
         if (seedVisitDocs.length > 0) {
           const batch = writeBatch(db);
           for (const d of seedVisitDocs) {
@@ -291,7 +292,31 @@ class DatabaseService {
           await batch.commit();
         }
 
-        const aSnap = await getDocs(collection(db, 'appointments'));
+        // Fetch cloud appointments from settings/appointments and optionally collection 'appointments'
+        let validCloudAppts: Appointment[] = [];
+        try {
+          const apptsDocSnap = await getDoc(doc(db, 'settings', 'appointments'));
+          if (apptsDocSnap.exists() && Array.isArray(apptsDocSnap.data()?.list)) {
+            validCloudAppts = apptsDocSnap.data()?.list as Appointment[];
+          }
+        } catch (e) {
+          console.warn('Could not read settings/appointments during init:', e);
+        }
+
+        try {
+          const aSnap = await getDocs(collection(db, 'appointments'));
+          if (!aSnap.empty) {
+            const existingIds = new Set(validCloudAppts.map((a) => a.id));
+            aSnap.forEach((d) => {
+              const item = d.data() as Appointment;
+              if (item?.id && !existingIds.has(item.id)) {
+                validCloudAppts.push(item);
+              }
+            });
+          }
+        } catch {
+          // Top-level appointments collection might be restricted by legacy Firestore rules
+        }
 
         // Smart Startup Sync: Upload any local items that don't exist in Firestore
         const localPatients = await this.getLocalPatients();
@@ -300,14 +325,14 @@ class DatabaseService {
 
         const cloudPatientIds = new Set(pSnap.docs.map((d) => d.id));
         const cloudVisitIds = new Set(vSnap.docs.map((d) => d.id));
-        const cloudApptIds = new Set(aSnap.docs.map((d) => d.id));
+        const cloudApptIds = new Set(validCloudAppts.filter(a => a?.id).map((a) => a.id));
 
-        const unsyncedPatients = localPatients.filter((p) => !cloudPatientIds.has(p.id) && !p.id.startsWith('p-seed-'));
-        const unsyncedVisits = localVisits.filter((v) => !cloudVisitIds.has(v.id) && !v.id.startsWith('v-seed-'));
-        const unsyncedAppts = localAppts.filter((a) => !cloudApptIds.has(a.id));
+        const unsyncedPatients = localPatients.filter((p) => p?.id && !cloudPatientIds.has(p.id) && !p.id?.startsWith('p-seed-'));
+        const unsyncedVisits = localVisits.filter((v) => v?.id && !cloudVisitIds.has(v.id) && !v.id?.startsWith('v-seed-'));
+        const unsyncedAppts = localAppts.filter((a) => a?.id && !cloudApptIds.has(a.id));
 
-        if (unsyncedPatients.length > 0 || unsyncedVisits.length > 0 || unsyncedAppts.length > 0) {
-          console.log(`[Firebase Sync] Auto-uploading unsynced local data to Firestore: ${unsyncedPatients.length} patients, ${unsyncedVisits.length} visits, ${unsyncedAppts.length} appts`);
+        if (unsyncedPatients.length > 0 || unsyncedVisits.length > 0) {
+          console.log(`[Firebase Sync] Auto-uploading unsynced patients/visits to Firestore`);
           const syncBatch = writeBatch(db);
           for (const p of unsyncedPatients) {
             syncBatch.set(doc(db, 'patients', p.id), cleanForFirestore(p));
@@ -315,10 +340,30 @@ class DatabaseService {
           for (const v of unsyncedVisits) {
             syncBatch.set(doc(db, 'visits', v.id), cleanForFirestore(v));
           }
-          for (const a of unsyncedAppts) {
-            syncBatch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
-          }
           await syncBatch.commit();
+        }
+
+        if (unsyncedAppts.length > 0) {
+          console.log(`[Firebase Sync] Auto-uploading ${unsyncedAppts.length} unsynced appointments to Firestore`);
+          const mergedAppts = [...validCloudAppts, ...unsyncedAppts];
+          try {
+            await setDoc(doc(db, 'settings', 'appointments'), {
+              list: cleanForFirestore(mergedAppts),
+              totalCount: mergedAppts.length,
+              updatedAt: new Date().toISOString(),
+            });
+            for (const a of unsyncedAppts) {
+              await setDoc(doc(db, 'settings', a.id), cleanForFirestore(a));
+              try {
+                await setDoc(doc(db, 'appointments', a.id), cleanForFirestore(a));
+              } catch {
+                // ignore
+              }
+            }
+            validCloudAppts = mergedAppts;
+          } catch (syncErr) {
+            console.warn('Initial appointments sync warning:', syncErr);
+          }
         }
 
         // Cache all cloud data locally so local storage is ready for offline
@@ -328,7 +373,6 @@ class DatabaseService {
         const validCloudVisits = vSnap.docs
           .map((d) => d.data() as TherapyVisit)
           .filter((v) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
-        const validCloudAppts = aSnap.docs.map((d) => d.data() as Appointment);
 
         if (validCloudPatients.length > 0) {
           await this.cacheLocalPatients(validCloudPatients);
@@ -364,7 +408,7 @@ class DatabaseService {
       pReq.onsuccess = () => {
         const pts = pReq.result || [];
         for (const p of pts) {
-          if (p.id?.startsWith('p-seed-')) {
+          if (p?.id?.startsWith('p-seed-')) {
             pStore.delete(p.id);
           }
         }
@@ -375,8 +419,8 @@ class DatabaseService {
       vReq.onsuccess = () => {
         const vsts = vReq.result || [];
         for (const v of vsts) {
-          if (v.id?.startsWith('v-seed-') || v.patientId?.startsWith('p-seed-')) {
-            vStore.delete(v.id);
+          if (v?.id?.startsWith('v-seed-') || v?.patientId?.startsWith('p-seed-')) {
+            if (v?.id) vStore.delete(v.id);
           }
         }
       };
@@ -389,14 +433,14 @@ class DatabaseService {
       const rawPts = localStorage.getItem('bfisio_patients');
       if (rawPts) {
         const pts = JSON.parse(rawPts);
-        const filtered = pts.filter((p: any) => !p.id?.startsWith('p-seed-'));
+        const filtered = Array.isArray(pts) ? pts.filter((p: any) => !p?.id?.startsWith('p-seed-')) : [];
         localStorage.setItem('bfisio_patients', JSON.stringify(filtered));
       }
 
       const rawVisits = localStorage.getItem('bfisio_visits');
       if (rawVisits) {
         const vsts = JSON.parse(rawVisits);
-        const filtered = vsts.filter((v: any) => !v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-'));
+        const filtered = Array.isArray(vsts) ? vsts.filter((v: any) => !v?.id?.startsWith('v-seed-') && !v?.patientId?.startsWith('p-seed-')) : [];
         localStorage.setItem('bfisio_visits', JSON.stringify(filtered));
       }
 
@@ -430,7 +474,7 @@ class DatabaseService {
               list.push(data);
             }
           });
-          list.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+          list.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
           this.cacheLocalPatients(list);
           callback(list);
         }, (err) => {
@@ -456,7 +500,7 @@ class DatabaseService {
               list.push(data);
             }
           });
-          list.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+          list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.visitNumber || 0) - (a.visitNumber || 0));
           this.cacheLocalVisits(list);
           callback(list);
         }, (err) => {
@@ -474,18 +518,51 @@ class DatabaseService {
   subscribeAppointments(callback: (appointments: Appointment[]) => void): () => void {
     if (isFirebaseReady && db) {
       try {
-        const unsub = onSnapshot(collection(db, 'appointments'), (snapshot) => {
-          const list: Appointment[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as Appointment);
-          });
-          list.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
-          this.cacheLocalAppointments(list);
-          callback(list);
-        }, (err) => {
-          console.warn('Firestore subscribeAppointments snapshot error:', err);
-        });
-        return unsub;
+        // 1. Primary real-time listener on doc(db, 'settings', 'appointments')
+        const unsubSettings = onSnapshot(
+          doc(db, 'settings', 'appointments'),
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              const list: Appointment[] = Array.isArray(data?.list) ? data.list : [];
+              list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
+              this.cacheLocalAppointments(list);
+              callback(list);
+            }
+          },
+          (err) => {
+            console.warn('Firestore subscribeAppointments settings error:', err);
+          }
+        );
+
+        // 2. Secondary listener on collection(db, 'appointments') if permitted
+        let unsubCollection = () => {};
+        try {
+          unsubCollection = onSnapshot(
+            collection(db, 'appointments'),
+            (snapshot) => {
+              if (!snapshot.empty) {
+                const list: Appointment[] = [];
+                snapshot.forEach((docSnap) => {
+                  list.push(docSnap.data() as Appointment);
+                });
+                list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
+                this.cacheLocalAppointments(list);
+                callback(list);
+              }
+            },
+            () => {
+              // Gracefully handle if collection permissions are not active
+            }
+          );
+        } catch {
+          // ignore
+        }
+
+        return () => {
+          unsubSettings();
+          unsubCollection();
+        };
       } catch (err) {
         console.warn('Error creating Firestore appointments subscription:', err);
       }
@@ -505,7 +582,7 @@ class DatabaseService {
             list.push(p);
           }
         });
-        list.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
+        list.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
         if (list.length > 0) {
           await this.cacheLocalPatients(list);
           return list;
@@ -594,10 +671,12 @@ class DatabaseService {
     const patients = await this.getAllPatients();
     let maxNumber = 0;
     for (const p of patients) {
-      const match = p.mrn.match(/RM-(\d+)/i);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNumber) maxNumber = num;
+      if (p && typeof p.mrn === 'string') {
+        const match = p.mrn.match(/RM-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNumber) maxNumber = num;
+        }
       }
     }
     const nextNumber = maxNumber + 1;
@@ -715,7 +794,7 @@ class DatabaseService {
             list.push(v);
           }
         });
-        list.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.visitNumber || 0) - (a.visitNumber || 0));
         if (list.length > 0) {
           await this.cacheLocalVisits(list);
           return list;
@@ -739,7 +818,7 @@ class DatabaseService {
     const visits = await this.getAllVisits();
     return visits
       .filter(v => v.patientId === patientId)
-      .sort((a, b) => a.date.localeCompare(b.date) || a.visitNumber - b.visitNumber);
+      .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.visitNumber || 0) - (b.visitNumber || 0));
   }
 
   // Calculate visit number for a given patient chronologically
@@ -834,7 +913,7 @@ class DatabaseService {
 
     const visits = await this.getVisitsByPatient(patientId);
     // Sort visits chronologically
-    visits.sort((a, b) => a.date.localeCompare(b.date));
+    visits.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
     // Fix visit numbers in sequence
     for (let i = 0; i < visits.length; i++) {
@@ -893,40 +972,62 @@ class DatabaseService {
   async getAllAppointments(): Promise<Appointment[]> {
     if (isFirebaseReady && db) {
       try {
-        const snap = await getDocs(collection(db, 'appointments'));
-        const cloudList: Appointment[] = [];
-        snap.forEach((docSnap) => {
-          cloudList.push(docSnap.data() as Appointment);
-        });
+        let cloudList: Appointment[] = [];
 
-        // Smart reconciliation: Check if there are local appointments not yet in Firestore
+        // 1. Fetch from Firestore settings/appointments master document
+        try {
+          const docSnap = await getDoc(doc(db, 'settings', 'appointments'));
+          if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
+            cloudList = docSnap.data()?.list as Appointment[];
+          }
+        } catch (e) {
+          console.warn('Firestore getDoc settings/appointments warning:', e);
+        }
+
+        // 2. Try top-level appointments collection if permitted
+        try {
+          const snap = await getDocs(collection(db, 'appointments'));
+          if (!snap.empty) {
+            const existingIds = new Set(cloudList.map((a) => a.id));
+            snap.forEach((d) => {
+              const a = d.data() as Appointment;
+              if (!existingIds.has(a.id)) {
+                cloudList.push(a);
+              }
+            });
+          }
+        } catch {
+          // Top-level appointments collection might be restricted, fallback to settings/appointments
+        }
+
+        // 3. Smart reconciliation: Check if there are local appointments not yet in Firestore
         const localList = await this.getLocalAppointments();
         const cloudIds = new Set(cloudList.map((a) => a.id));
         const unsynced = localList.filter((a) => !cloudIds.has(a.id));
 
         if (unsynced.length > 0) {
           console.log(`[Firestore Sync] Auto-uploading ${unsynced.length} unsynced local appointments to Firestore`);
+          cloudList = [...cloudList, ...unsynced];
           try {
-            const batch = writeBatch(db);
+            await setDoc(doc(db, 'settings', 'appointments'), {
+              list: cleanForFirestore(cloudList),
+              totalCount: cloudList.length,
+              updatedAt: new Date().toISOString(),
+            });
             for (const a of unsynced) {
-              batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
-              cloudList.push(a);
-            }
-            await batch.commit();
-          } catch (batchErr) {
-            console.warn('Batch sync appointments failed, trying individual setDoc:', batchErr);
-            for (const a of unsynced) {
+              await setDoc(doc(db, 'settings', a.id), cleanForFirestore(a));
               try {
                 await setDoc(doc(db, 'appointments', a.id), cleanForFirestore(a));
-                cloudList.push(a);
-              } catch (singleErr) {
-                console.warn('Single appointment setDoc error:', a.id, singleErr);
+              } catch {
+                // ignore
               }
             }
+          } catch (syncErr) {
+            console.warn('Auto sync appointments error:', syncErr);
           }
         }
 
-        cloudList.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+        cloudList.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
         await this.cacheLocalAppointments(cloudList);
         return cloudList;
       } catch (err) {
@@ -944,30 +1045,39 @@ class DatabaseService {
 
   // Dedicated sync method for schedules
   async syncAppointmentsToCloud(): Promise<{ success: boolean; syncedCount: number; totalCount: number }> {
+    const local = await this.getLocalAppointments();
     if (!isFirebaseReady || !db) {
-      const local = await this.getLocalAppointments();
       return { success: false, syncedCount: 0, totalCount: local.length };
     }
 
-    const local = await this.getLocalAppointments();
-    const snap = await getDocs(collection(db, 'appointments'));
-    const cloudIds = new Set(snap.docs.map((d) => d.id));
-    const unsynced = local.filter((a) => !cloudIds.has(a.id));
+    try {
+      // 1. Update master document in settings/appointments
+      await setDoc(doc(db, 'settings', 'appointments'), {
+        list: cleanForFirestore(local),
+        totalCount: local.length,
+        updatedAt: new Date().toISOString(),
+        syncedAt: new Date().toISOString(),
+      });
 
-    if (unsynced.length > 0) {
-      const batch = writeBatch(db);
-      for (const a of unsynced) {
-        batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
+      // 2. Save each appointment as individual document in settings
+      for (const a of local) {
+        await setDoc(doc(db, 'settings', a.id), cleanForFirestore(a));
+        try {
+          await setDoc(doc(db, 'appointments', a.id), cleanForFirestore(a));
+        } catch {
+          // ignore
+        }
       }
-      await batch.commit();
-    }
 
-    const merged = await this.getAllAppointments();
-    return {
-      success: true,
-      syncedCount: unsynced.length,
-      totalCount: merged.length,
-    };
+      return {
+        success: true,
+        syncedCount: local.length,
+        totalCount: local.length,
+      };
+    } catch (err) {
+      console.error('syncAppointmentsToCloud error:', err);
+      throw err;
+    }
   }
 
   async saveAppointment(appt: Partial<Appointment> & { patientId: string; patientName: string; mrn: string; date: string; time: string }): Promise<Appointment> {
@@ -993,15 +1103,60 @@ class DatabaseService {
     // 1. Write to Firebase Firestore immediately
     if (isFirebaseReady && db) {
       try {
-        await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
-      } catch (err) {
-        console.warn('Firestore saveAppointment warning (will retry once):', err);
+        // A. Update individual appointment document in settings collection (e.g. settings/appt-...)
+        await setDoc(doc(db, 'settings', finalAppt.id), cleanForFirestore(finalAppt));
+
+        // B. Update master appointments document in settings collection (settings/appointments)
+        let currentList: Appointment[] = [];
         try {
-          await new Promise((r) => setTimeout(r, 400));
-          await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
-        } catch (retryErr) {
-          console.warn('Firestore saveAppointment secondary sync pending, local saved:', retryErr);
+          const docSnap = await getDoc(doc(db, 'settings', 'appointments'));
+          if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
+            currentList = docSnap.data()?.list as Appointment[];
+          }
+        } catch {
+          currentList = await this.getLocalAppointments();
         }
+
+        const idx = currentList.findIndex((a) => a.id === finalAppt.id);
+        if (idx >= 0) {
+          currentList[idx] = finalAppt;
+        } else {
+          currentList.push(finalAppt);
+        }
+
+        await setDoc(doc(db, 'settings', 'appointments'), {
+          list: cleanForFirestore(currentList),
+          totalCount: currentList.length,
+          updatedAt: new Date().toISOString(),
+        });
+
+        // C. Also update patient's document in Firestore with upcoming appointment details
+        if (finalAppt.patientId) {
+          try {
+            const pDocRef = doc(db, 'patients', finalAppt.patientId);
+            const pSnap = await getDoc(pDocRef);
+            if (pSnap.exists()) {
+              const patientAppts = currentList.filter((a) => a.patientId === finalAppt.patientId);
+              await updateDoc(pDocRef, {
+                nextAppointmentDate: finalAppt.date,
+                nextAppointmentTime: finalAppt.time,
+                scheduledAppointmentsCount: patientAppts.length,
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          } catch (pErr) {
+            console.warn('Update patient appointment reference warning:', pErr);
+          }
+        }
+
+        // D. Also attempt top-level appointments collection if permitted
+        try {
+          await setDoc(doc(db, 'appointments', finalAppt.id), cleanForFirestore(finalAppt));
+        } catch {
+          // Top-level write might be restricted by legacy Firestore rules, already stored in settings/appointments
+        }
+      } catch (err) {
+        console.error('Firestore saveAppointment error:', err);
       }
     }
 
@@ -1041,15 +1196,28 @@ class DatabaseService {
     // 1. Delete from Firestore
     if (isFirebaseReady && db) {
       try {
-        await deleteDoc(doc(db, 'appointments', id));
-      } catch (err) {
-        console.warn('Firestore deleteAppointment warning (will retry once):', err);
-        try {
-          await new Promise((r) => setTimeout(r, 400));
-          await deleteDoc(doc(db, 'appointments', id));
-        } catch (retryErr) {
-          console.warn('Firestore deleteAppointment secondary sync pending, local deleted:', retryErr);
+        // Delete individual doc in settings
+        await deleteDoc(doc(db, 'settings', id));
+
+        // Update settings/appointments master list
+        const docSnap = await getDoc(doc(db, 'settings', 'appointments'));
+        if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
+          const currentList = (docSnap.data()?.list as Appointment[]).filter((a) => a.id !== id);
+          await setDoc(doc(db, 'settings', 'appointments'), {
+            list: cleanForFirestore(currentList),
+            totalCount: currentList.length,
+            updatedAt: new Date().toISOString(),
+          });
         }
+
+        // Try deleting from top-level appointments collection
+        try {
+          await deleteDoc(doc(db, 'appointments', id));
+        } catch {
+          // ignore
+        }
+      } catch (err) {
+        console.warn('Firestore deleteAppointment warning:', err);
       }
     }
 
@@ -1092,11 +1260,29 @@ class DatabaseService {
     // 1. Delete all appointments from Firestore
     if (isFirebaseReady && db) {
       try {
-        const aSnap = await getDocs(collection(db, 'appointments'));
-        if (!aSnap.empty) {
-          const batch = writeBatch(db);
-          aSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-          await batch.commit();
+        await setDoc(doc(db, 'settings', 'appointments'), {
+          list: [],
+          totalCount: 0,
+          updatedAt: new Date().toISOString(),
+        });
+
+        // Also delete any settings documents starting with appt-
+        const sSnap = await getDocs(collection(db, 'settings'));
+        for (const d of sSnap.docs) {
+          if (d?.id?.startsWith('appt-')) {
+            await deleteDoc(d.ref);
+          }
+        }
+
+        try {
+          const aSnap = await getDocs(collection(db, 'appointments'));
+          if (!aSnap.empty) {
+            const batch = writeBatch(db);
+            aSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+            await batch.commit();
+          }
+        } catch {
+          // ignore
         }
       } catch (err) {
         console.warn('Firestore clearAllAppointments error:', err);
@@ -1208,13 +1394,19 @@ class DatabaseService {
     let transportRevenueTotal = 0;
 
     for (const v of visits) {
-      if (v.date === today) {
-        todayPatientIds.add(v.patientId);
-        todayRevenue += (v.payment.paidAmount || (v.payment.status === 'Lunas' ? v.payment.total : 0));
+      if (!v) continue;
+      const vDate = typeof v.date === 'string' ? v.date : '';
+      if (vDate === today) {
+        if (v.patientId) todayPatientIds.add(v.patientId);
+        if (v.payment) {
+          todayRevenue += (v.payment.paidAmount || (v.payment.status === 'Lunas' ? v.payment.total : 0));
+        }
       }
 
-      if (v.date.startsWith(currentMonth)) {
-        thisMonthRevenue += (v.payment.paidAmount || (v.payment.status === 'Lunas' ? v.payment.total : 0));
+      if (vDate && vDate.startsWith(currentMonth)) {
+        if (v.payment) {
+          thisMonthRevenue += (v.payment.paidAmount || (v.payment.status === 'Lunas' ? v.payment.total : 0));
+        }
       }
 
       if (v.location === 'Home Care') {
@@ -1223,13 +1415,15 @@ class DatabaseService {
         clinicVisits++;
       }
 
-      if (v.payment.status === 'Belum Lunas' || (v.payment.status === 'DP' && v.payment.remainingBalance > 0)) {
-        unpaidTransactions++;
-      }
+      if (v.payment) {
+        if (v.payment.status === 'Belum Lunas' || (v.payment.status === 'DP' && (v.payment.remainingBalance || 0) > 0)) {
+          unpaidTransactions++;
+        }
 
-      outstandingBalanceTotal += (v.payment.remainingBalance || 0);
-      therapyRevenueTotal += (v.payment.therapyPrice || 0);
-      transportRevenueTotal += (v.payment.transport || 0);
+        outstandingBalanceTotal += (v.payment.remainingBalance || 0);
+        therapyRevenueTotal += (v.payment.therapyPrice || 0);
+        transportRevenueTotal += (v.payment.transport || 0);
+      }
     }
 
     patientsTodayCount = todayPatientIds.size;
@@ -1295,11 +1489,26 @@ class DatabaseService {
           for (const v of visits) {
             batch.set(doc(db, 'visits', v.id), cleanForFirestore(v));
           }
-          for (const a of appointments) {
-            batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
-          }
           batch.set(doc(db, 'settings', 'app_settings'), cleanForFirestore({ id: 'app_settings', ...settings }));
+          batch.set(doc(db, 'settings', 'appointments'), {
+            list: cleanForFirestore(appointments),
+            totalCount: appointments.length,
+            updatedAt: new Date().toISOString(),
+          });
           await batch.commit();
+
+          for (const a of appointments) {
+            try {
+              await setDoc(doc(db, 'settings', a.id), cleanForFirestore(a));
+              try {
+                await setDoc(doc(db, 'appointments', a.id), cleanForFirestore(a));
+              } catch {
+                // ignore
+              }
+            } catch {
+              // ignore
+            }
+          }
         } catch (err) {
           console.error('Firestore restore error:', err);
         }
@@ -1363,11 +1572,27 @@ class DatabaseService {
     for (const v of visits) {
       batch.set(doc(db, 'visits', v.id), cleanForFirestore(v));
     }
-    for (const a of appointments) {
-      batch.set(doc(db, 'appointments', a.id), cleanForFirestore(a));
-    }
     batch.set(doc(db, 'settings', 'app_settings'), cleanForFirestore({ id: 'app_settings', ...settings }));
+    batch.set(doc(db, 'settings', 'appointments'), {
+      list: cleanForFirestore(appointments),
+      totalCount: appointments.length,
+      updatedAt: new Date().toISOString(),
+    });
     await batch.commit();
+
+    // Also write individual appointment documents into settings and collection if permitted
+    for (const a of appointments) {
+      try {
+        await setDoc(doc(db, 'settings', a.id), cleanForFirestore(a));
+        try {
+          await setDoc(doc(db, 'appointments', a.id), cleanForFirestore(a));
+        } catch {
+          // ignore
+        }
+      } catch (err) {
+        console.warn('Sync individual appointment error:', a.id, err);
+      }
+    }
 
     return {
       success: true,
@@ -1384,7 +1609,29 @@ class DatabaseService {
     }
     const pSnap = await getDocs(collection(db, 'patients'));
     const vSnap = await getDocs(collection(db, 'visits'));
-    const aSnap = await getDocs(collection(db, 'appointments'));
+
+    let cloudAppointments: Appointment[] = [];
+    try {
+      const apptDoc = await getDoc(doc(db, 'settings', 'appointments'));
+      if (apptDoc.exists() && Array.isArray(apptDoc.data()?.list)) {
+        cloudAppointments = apptDoc.data()?.list as Appointment[];
+      }
+    } catch (e) {
+      console.warn('pullCloudToLocal read settings/appointments:', e);
+    }
+
+    try {
+      const aSnap = await getDocs(collection(db, 'appointments'));
+      const topAppts = aSnap.docs.map((d) => d.data() as Appointment);
+      if (topAppts.length > 0) {
+        const idSet = new Set(cloudAppointments.map((a) => a.id));
+        for (const a of topAppts) {
+          if (!idSet.has(a.id)) cloudAppointments.push(a);
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     const cloudPatients: Patient[] = [];
     pSnap.forEach((d) => {
@@ -1398,14 +1645,9 @@ class DatabaseService {
       if (!v.id?.startsWith('v-seed-') && !v.patientId?.startsWith('p-seed-')) cloudVisits.push(v);
     });
 
-    const cloudAppointments: Appointment[] = [];
-    aSnap.forEach((d) => {
-      cloudAppointments.push(d.data() as Appointment);
-    });
-
-    cloudPatients.sort((a, b) => (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt));
-    cloudVisits.sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
-    cloudAppointments.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+    cloudPatients.sort((a, b) => (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || ''));
+    cloudVisits.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.visitNumber || 0) - (a.visitNumber || 0));
+    cloudAppointments.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
 
     await this.cacheLocalPatients(cloudPatients);
     await this.cacheLocalVisits(cloudVisits);
@@ -1459,8 +1701,8 @@ class DatabaseService {
     localVisits: number;
     localAppointments: number;
   }> {
-    const localPatients = (await this.getLocalPatients()).filter((p) => !p.id.startsWith('p-seed-'));
-    const localVisits = (await this.getLocalVisits()).filter((v) => !v.id.startsWith('v-seed-'));
+    const localPatients = (await this.getLocalPatients()).filter((p) => !p?.id?.startsWith('p-seed-'));
+    const localVisits = (await this.getLocalVisits()).filter((v) => !v?.id?.startsWith('v-seed-'));
     const localAppointments = await this.getLocalAppointments();
 
     let cloudPatients = 0;
@@ -1470,11 +1712,27 @@ class DatabaseService {
     if (isFirebaseReady && db) {
       try {
         const pSnap = await getDocs(collection(db, 'patients'));
-        cloudPatients = pSnap.docs.filter((d) => !d.id.startsWith('p-seed-')).length;
+        cloudPatients = pSnap.docs.filter((d) => !d?.id?.startsWith('p-seed-')).length;
         const vSnap = await getDocs(collection(db, 'visits'));
-        cloudVisits = vSnap.docs.filter((d) => !d.id.startsWith('v-seed-') && !d.data().patientId?.startsWith('p-seed-')).length;
-        const aSnap = await getDocs(collection(db, 'appointments'));
-        cloudAppointments = aSnap.size;
+        cloudVisits = vSnap.docs.filter((d) => !d?.id?.startsWith('v-seed-') && !d.data()?.patientId?.startsWith('p-seed-')).length;
+        
+        try {
+          const apptDoc = await getDoc(doc(db, 'settings', 'appointments'));
+          if (apptDoc.exists() && Array.isArray(apptDoc.data()?.list)) {
+            cloudAppointments = apptDoc.data()?.list.length || 0;
+          }
+        } catch {
+          // ignore
+        }
+
+        if (cloudAppointments === 0) {
+          try {
+            const aSnap = await getDocs(collection(db, 'appointments'));
+            cloudAppointments = aSnap.size;
+          } catch {
+            // ignore
+          }
+        }
       } catch (e) {
         console.warn('Diagnostics cloud fetch error:', e);
       }
@@ -1498,13 +1756,35 @@ class DatabaseService {
       try {
         const pSnap = await getDocs(collection(db, 'patients'));
         const vSnap = await getDocs(collection(db, 'visits'));
-        const aSnap = await getDocs(collection(db, 'appointments'));
 
         const batch = writeBatch(db);
         pSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
         vSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-        aSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+        batch.set(doc(db, 'settings', 'appointments'), {
+          list: [],
+          totalCount: 0,
+          updatedAt: new Date().toISOString(),
+        });
         await batch.commit();
+
+        // Clear settings appointment docs
+        const sSnap = await getDocs(collection(db, 'settings'));
+        for (const d of sSnap.docs) {
+          if (d?.id?.startsWith('appt-')) {
+            await deleteDoc(d.ref);
+          }
+        }
+
+        try {
+          const aSnap = await getDocs(collection(db, 'appointments'));
+          if (!aSnap.empty) {
+            const aBatch = writeBatch(db);
+            aSnap.docs.forEach((docSnap) => aBatch.delete(docSnap.ref));
+            await aBatch.commit();
+          }
+        } catch {
+          // ignore
+        }
       } catch (err) {
         console.error('Error clearing Firestore patients/visits/appointments:', err);
       }

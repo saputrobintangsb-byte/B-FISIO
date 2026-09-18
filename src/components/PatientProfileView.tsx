@@ -78,7 +78,7 @@ export const PatientProfileView: React.FC = () => {
     if (!selectedPatientId) return [];
     return visits
       .filter((v) => v.patientId === selectedPatientId)
-      .sort((a, b) => b.date.localeCompare(a.date) || b.visitNumber - a.visitNumber);
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.visitNumber || 0) - (a.visitNumber || 0));
   }, [visits, selectedPatientId]);
 
   // Calculate BMI info

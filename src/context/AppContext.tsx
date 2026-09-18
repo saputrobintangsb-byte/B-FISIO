@@ -338,9 +338,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (idx >= 0) {
           const copy = [...prev];
           copy[idx] = saved;
-          return copy.sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+          return copy.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
         }
-        return [saved, ...prev].sort((a, b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+        return [saved, ...prev].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.time || '').localeCompare(b.time || ''));
       });
       await refreshData();
       return saved;

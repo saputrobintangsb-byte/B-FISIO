@@ -95,16 +95,16 @@ export const PatientListView: React.FC = () => {
       })
       .sort((a, b) => {
         if (sortBy === 'newestDate') {
-          return (b.lastVisitDate || b.createdAt).localeCompare(a.lastVisitDate || a.createdAt);
+          return (b.lastVisitDate || b.createdAt || '').localeCompare(a.lastVisitDate || a.createdAt || '');
         }
         if (sortBy === 'name') {
-          return a.fullName.localeCompare(b.fullName);
+          return (a.fullName || '').localeCompare(b.fullName || '');
         }
         if (sortBy === 'mrn') {
-          return a.mrn.localeCompare(b.mrn);
+          return (a.mrn || '').localeCompare(b.mrn || '');
         }
         if (sortBy === 'totalVisits') {
-          return b.totalVisits - a.totalVisits;
+          return (b.totalVisits || 0) - (a.totalVisits || 0);
         }
         return 0;
       });

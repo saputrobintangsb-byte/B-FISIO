@@ -13,7 +13,7 @@ export const PrintMedicalRecordModal: React.FC = () => {
 
   const patientVisits = visits
     .filter((v) => v.patientId === printingPatient.id)
-    .sort((a, b) => a.date.localeCompare(b.date) || a.visitNumber - b.visitNumber);
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.visitNumber || 0) - (b.visitNumber || 0));
 
   const bmiInfo = calculateAsianBMI(
     printingPatient.vitalSigns?.weight,
