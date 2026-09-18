@@ -59,6 +59,29 @@
       },
       "required": ["id", "patientId", "date"]
     },
+    "appointments": {
+      "title": "Appointment",
+      "description": "Jadwal dan janji temu pasien fisioterapi",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string" },
+        "mrn": { "type": "string" },
+        "phone": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "endTime": { "type": "string" },
+        "location": { "type": "string" },
+        "therapist": { "type": "string" },
+        "complaintOrService": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "patientId", "patientName", "date", "time", "status"]
+    },
     "settings": {
       "title": "AppSettings",
       "description": "Pengaturan klinik, tarif layanan, data terapis, dan intervensi",
@@ -74,5 +97,23 @@
       }
     }
   },
-  "firestoreRules": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /patients/{patientId} {\n      allow read, write: if true;\n    }\n    match /visits/{visitId} {\n      allow read, write: if true;\n    }\n    match /settings/{settingId} {\n      allow read, write: if true;\n    }\n  }\n}"
+  "firestore": {
+    "/patients/{patientId}": {
+      "schema": "patients",
+      "description": "Master data pasien fisioterapi dan rekam medis ICF"
+    },
+    "/visits/{visitId}": {
+      "schema": "visits",
+      "description": "Catatan kunjungan terapi fisioterapi, SOAP, tindakan, dan rincian pembayaran"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "appointments",
+      "description": "Jadwal janji temu pasien fisioterapi"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Pengaturan klinik, tarif layanan, data terapis, dan intervensi"
+    }
+  },
+  "firestoreRules": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /patients/{patientId} {\n      allow read, write: if true;\n    }\n    match /visits/{visitId} {\n      allow read, write: if true;\n    }\n    match /appointments/{appointmentId} {\n      allow read, write: if true;\n    }\n    match /settings/{settingId} {\n      allow read, write: if true;\n    }\n  }\n}"
 }
