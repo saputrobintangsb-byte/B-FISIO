@@ -153,7 +153,15 @@ class DatabaseService {
     if (!name && !mrn) return false;
 
     // A valid patient in clinical records must have a meaningful name
-    if (!name || name === '-' || name.toLowerCase() === 'undefined' || name.toLowerCase() === 'null' || name.toLowerCase() === 'tanpa nama') {
+    if (
+      !name ||
+      name === '-' ||
+      name.toLowerCase() === 'undefined' ||
+      name.toLowerCase() === 'null' ||
+      name.toLowerCase() === 'tanpa nama' ||
+      name.toLowerCase() === 'cek' ||
+      p.id === 'p-1789714326846-gv3v4q'
+    ) {
       return false;
     }
 
